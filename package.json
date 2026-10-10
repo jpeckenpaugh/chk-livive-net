@@ -4,7 +4,7 @@
   "description": "Client-side, zero-dependency browser-based Checkers (English Draughts)",
   "type": "module",
   "scripts": {
-    "test": "node --test test/test_rules.js test/test_controller.js test/test_ai.js"
+    "test": "node --test test/test_rules.js test/test_controller.js test/test_ai.js test/test_polish.js"
   },
   "keywords": ["checkers", "draughts", "game", "browser"],
   "author": "",

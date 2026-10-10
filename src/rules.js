@@ -318,15 +318,23 @@ export function undoMoveInPlace(board, move, prevPiece, capturedPiece) {
   }
 }
 
+export const DRAW_RULE_HALF_MOVES = 80;
+
 /**
  * Evaluates whether the game is over and returns the winner.
  * A player wins if the opponent has 0 pieces remaining or 0 legal moves available.
+ * A draw is declared if 40 full moves (80 half-moves) occur without a capture or man advance.
  *
  * @param {Int8Array} board
  * @param {number} player - current player whose turn it is to move
- * @returns {number|'draw'|null} winner (1, -1, or null if ongoing)
+ * @param {number} [halfMovesWithoutProgress=0] - turns without capture or man advance
+ * @returns {number|'draw'|null} winner (1, -1, 'draw', or null if ongoing)
  */
-export function checkGameOver(board, player) {
+export function checkGameOver(board, player, halfMovesWithoutProgress = 0) {
+  if (halfMovesWithoutProgress >= DRAW_RULE_HALF_MOVES) {
+    return 'draw';
+  }
+
   let redCount = 0;
   let blackCount = 0;
 
@@ -348,3 +356,37 @@ export function checkGameOver(board, player) {
 
   return null;
 }
+
+/**
+ * Returns detailed victory / game-over reason.
+ * @param {Int8Array} board
+ * @param {number} player
+ * @param {number} [halfMovesWithoutProgress=0]
+ * @returns {'elimination'|'trapped'|'draw'|null}
+ */
+export function getGameOverReason(board, player, halfMovesWithoutProgress = 0) {
+  if (halfMovesWithoutProgress >= DRAW_RULE_HALF_MOVES) {
+    return 'draw';
+  }
+
+  let redCount = 0;
+  let blackCount = 0;
+
+  for (let i = 0; i < 32; i++) {
+    const piece = board[i];
+    if (isRed(piece)) redCount++;
+    else if (isBlack(piece)) blackCount++;
+  }
+
+  if (redCount === 0 || blackCount === 0) {
+    return 'elimination';
+  }
+
+  const legalMoves = getLegalMoves(board, player);
+  if (legalMoves.length === 0) {
+    return 'trapped';
+  }
+
+  return null;
+}
+

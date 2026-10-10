@@ -7,6 +7,8 @@
 import {
   PLAYER_RED,
   PLAYER_BLACK,
+  RED_MAN,
+  BLACK_MAN,
   EMPTY,
   isPlayerPiece,
   createInitialState
@@ -15,7 +17,9 @@ import {
 import {
   getLegalMoves,
   applyMove,
-  checkGameOver
+  checkGameOver,
+  getGameOverReason,
+  DRAW_RULE_HALF_MOVES
 } from './rules.js';
 
 import { CheckersAI } from './ai.js';
@@ -30,6 +34,21 @@ export class CheckersController {
     this.state = createInitialState();
     this.lastMove = null;
     this.statusMessage = '';
+
+    // Match statistics tracking
+    this.stats = {
+      turnCount: 0,
+      redCaptures: 0,
+      blackCaptures: 0,
+      redKingsCrowned: 0,
+      blackKingsCrowned: 0,
+      startTime: Date.now()
+    };
+
+    // 40-move draw rule progress counter
+    this.halfMovesWithoutProgress = 0;
+    this.winReason = null;
+    this.isAnimating = false;
 
     // Game Mode: 'ai' (Play vs AI) or 'pvp' (Pass & Play)
     this.gameMode = 'ai';
@@ -54,6 +73,7 @@ export class CheckersController {
     this.aiTimeoutId = null;
   }
 
+
   /**
    * Initializes event listeners and starts the game.
    */
@@ -69,7 +89,7 @@ export class CheckersController {
       }
     });
 
-    // 2. Control buttons
+    // 2. Control buttons and review modal
     if (typeof document !== 'undefined') {
       const btnNewGame = document.getElementById('btn-new-game');
       if (btnNewGame) {
@@ -79,6 +99,20 @@ export class CheckersController {
       const btnModalRestart = document.getElementById('btn-modal-restart');
       if (btnModalRestart) {
         btnModalRestart.addEventListener('click', () => this.resetGame());
+      }
+
+      const btnModalReview = document.getElementById('btn-modal-review');
+      if (btnModalReview) {
+        btnModalReview.addEventListener('click', () => {
+          this.renderer.hideModalForReview();
+        });
+      }
+
+      const btnReopenModal = document.getElementById('btn-reopen-modal');
+      if (btnReopenModal) {
+        btnReopenModal.addEventListener('click', () => {
+          this.renderer.showReviewRecap();
+        });
       }
 
       const btnRotate = document.getElementById('btn-rotate');
@@ -109,8 +143,48 @@ export class CheckersController {
       }
     }
 
-    // 3. Initial render
+    // 3. Global keyboard shortcut dispatcher
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', (e) => this.handleKeyDown(e));
+    }
+
+    // 4. Initial render
     this.updateView();
+  }
+
+  /**
+   * Dispatches keyboard shortcuts (Esc, R, M, N, F) safely.
+   * @param {KeyboardEvent} event
+   */
+  handleKeyDown(event) {
+    const targetTag = (event.target && event.target.tagName) ? event.target.tagName : '';
+    if (targetTag === 'INPUT' || targetTag === 'SELECT' || targetTag === 'TEXTAREA') {
+      return;
+    }
+
+    const key = event.key ? event.key.toLowerCase() : '';
+    if (event.key === 'Escape') {
+      this.handleEscapeKey();
+    } else if (key === 'r') {
+      this.resetGame();
+    } else if (key === 'm') {
+      this.toggleMute();
+    } else if (key === 'n') {
+      this.toggleNotation();
+    } else if (key === 'f') {
+      this.toggleRotate();
+    }
+  }
+
+  /**
+   * Deselects current piece unless locked into a multi-jump sequence.
+   */
+  handleEscapeKey() {
+    if (this.state.mustContinueJumpFrom === null && this.state.selectedSquare !== null) {
+      this.state.selectedSquare = null;
+      this.statusMessage = '';
+      this.updateView();
+    }
   }
 
   /**
@@ -118,7 +192,8 @@ export class CheckersController {
    * @param {number} index
    */
   handleSquareClick(index) {
-    // Ignore input if game is over or current turn belongs to AI
+    // Ignore input if animating, game is over, or current turn belongs to AI
+    if (this.isAnimating) return;
     if (this.state.winner !== null) return;
     if (this.playerTypes[this.state.turn] !== 'human') return;
 
@@ -209,8 +284,59 @@ export class CheckersController {
    * @param {{ from: number, to: number, isJump: boolean, captured: number|null }} move
    */
   executeMove(move) {
+    if (this.isAnimating) return;
+
+    const movingPiece = this.state.board[move.from];
+    const isMan = movingPiece === RED_MAN || movingPiece === BLACK_MAN;
+    const isJump = move.isJump;
+    const currentTurn = this.state.turn;
+
+    // Apply move through pure rules engine
     const { nextBoard, crowned, canContinueJump } = applyMove(this.state.board, move);
 
+    // Track 40-move draw progress rule
+    if (isJump || isMan) {
+      this.halfMovesWithoutProgress = 0;
+    } else {
+      this.halfMovesWithoutProgress++;
+    }
+
+    // Track match statistics
+    this.stats.turnCount++;
+    if (isJump) {
+      if (currentTurn === PLAYER_RED) {
+        this.stats.redCaptures++;
+      } else {
+        this.stats.blackCaptures++;
+      }
+    }
+    if (crowned) {
+      if (currentTurn === PLAYER_RED) {
+        this.stats.redKingsCrowned++;
+      } else {
+        this.stats.blackKingsCrowned++;
+      }
+    }
+
+    const shouldAnimate = typeof window !== 'undefined' && this.renderer && typeof this.renderer.animateMove === 'function';
+
+    if (shouldAnimate) {
+      this.isAnimating = true;
+      this.renderer.animateMove(move).then(() => {
+        this.isAnimating = false;
+        this._finalizeMove(move, nextBoard, crowned, canContinueJump);
+      });
+      return;
+    }
+
+    this._finalizeMove(move, nextBoard, crowned, canContinueJump);
+  }
+
+  /**
+   * Finalizes state mutation, sound effects, multi-jump checks, and game-over detection.
+   * @private
+   */
+  _finalizeMove(move, nextBoard, crowned, canContinueJump) {
     this.state.board = nextBoard;
     this.lastMove = { from: move.from, to: move.to };
 
@@ -238,10 +364,11 @@ export class CheckersController {
       this.state.turn = -this.state.turn;
     }
 
-    // Check victory condition
-    const winner = checkGameOver(this.state.board, this.state.turn);
+    // Check victory condition with 40-move rule
+    const winner = checkGameOver(this.state.board, this.state.turn, this.halfMovesWithoutProgress);
     if (winner !== null) {
       this.state.winner = winner;
+      this.winReason = getGameOverReason(this.state.board, this.state.turn, this.halfMovesWithoutProgress);
       this.renderer.sound.playWin();
     }
 
@@ -249,15 +376,17 @@ export class CheckersController {
 
     // If turn switched or continues to AI, schedule AI turn
     if (this.state.winner === null && this.playerTypes[this.state.turn] === 'ai') {
-      this.scheduleAiTurn();
+      // 250ms pacing between successive chained hops, 300ms for opening turn moves
+      const delay = canContinueJump ? 250 : 300;
+      this.scheduleAiTurn(delay);
     }
   }
 
   /**
    * Schedules AI move execution with natural delay and status indicator.
-   * Uses 300ms pacing for both normal moves and chained jumps.
+   * @param {number} [delay=300] - milliseconds to wait before AI computes and executes
    */
-  scheduleAiTurn() {
+  scheduleAiTurn(delay = 300) {
     if (!this.aiAgent) return;
     if (this.aiTimeoutId !== null) {
       clearTimeout(this.aiTimeoutId);
@@ -276,7 +405,7 @@ export class CheckersController {
       if (move) {
         this.executeMove(move);
       }
-    }, 300);
+    }, delay);
   }
 
   /**
@@ -338,6 +467,24 @@ export class CheckersController {
 
     const mustJump = legalMoves.some((m) => m.isJump);
 
+    // Compute prey indices for jump targets
+    const preyIndices = new Set();
+    if (this.state.mustContinueJumpFrom !== null) {
+      const jumps = legalMoves.filter((m) => m.from === this.state.mustContinueJumpFrom && m.isJump);
+      for (let i = 0; i < jumps.length; i++) {
+        if (jumps[i].captured !== null && jumps[i].captured !== undefined) {
+          preyIndices.add(jumps[i].captured);
+        }
+      }
+    } else if (this.state.selectedSquare !== null) {
+      const jumps = legalMovesForSelected.filter((m) => m.isJump);
+      for (let i = 0; i < jumps.length; i++) {
+        if (jumps[i].captured !== null && jumps[i].captured !== undefined) {
+          preyIndices.add(jumps[i].captured);
+        }
+      }
+    }
+
     this.renderer.render({
       state: this.state,
       legalMovesForSelected,
@@ -345,7 +492,10 @@ export class CheckersController {
       lastMove: this.lastMove,
       mustJump,
       message: this.statusMessage,
-      newlyCrownedIndex
+      newlyCrownedIndex,
+      stats: this.stats,
+      winReason: this.winReason,
+      preyIndices
     });
   }
 
@@ -360,6 +510,17 @@ export class CheckersController {
     this.state = createInitialState();
     this.lastMove = null;
     this.statusMessage = '';
+    this.halfMovesWithoutProgress = 0;
+    this.winReason = null;
+    this.isAnimating = false;
+    this.stats = {
+      turnCount: 0,
+      redCaptures: 0,
+      blackCaptures: 0,
+      redKingsCrowned: 0,
+      blackKingsCrowned: 0,
+      startTime: Date.now()
+    };
     this.updateView();
 
     if (this.playerTypes[this.state.turn] === 'ai') {
@@ -391,3 +552,4 @@ export class CheckersController {
     this.renderer.setMuted(this.soundMuted);
   }
 }
+

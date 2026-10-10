@@ -185,6 +185,18 @@ export class CheckersRenderer {
     this.modal = document.getElementById('game-over-modal');
     this.modalTitle = document.getElementById('modal-title');
     this.modalMessage = document.getElementById('modal-message');
+    this.modalTrophy = document.getElementById('modal-trophy');
+    this.modalReasonBadge = document.getElementById('modal-reason-badge');
+    this.modalStatTurns = document.getElementById('modal-stat-turns');
+    this.modalStatTime = document.getElementById('modal-stat-time');
+    this.modalStatRedCaptures = document.getElementById('modal-stat-red-captures');
+    this.modalStatBlackCaptures = document.getElementById('modal-stat-black-captures');
+    this.modalStatKings = document.getElementById('modal-stat-kings');
+    this.btnModalReview = document.getElementById('btn-modal-review');
+    this.btnReopenModal = document.getElementById('btn-reopen-modal');
+
+    this.multiJumpBanner = document.getElementById('multijump-banner');
+    this.multiJumpText = document.getElementById('multijump-text');
 
     this.soundOnIcon = document.getElementById('icon-sound-on');
     this.soundOffIcon = document.getElementById('icon-sound-off');
@@ -273,6 +285,59 @@ export class CheckersRenderer {
   }
 
   /**
+   * Performs slide (200ms) or hop (250ms) animation, and triggers
+   * dissipation animation (200ms) on jumped piece.
+   * Resolves Promise when animation completes.
+   * @param {{ from: number, to: number, isJump: boolean, captured: number|null }} move
+   * @returns {Promise<void>}
+   */
+  async animateMove(move) {
+    if (typeof window === 'undefined' || !this.darkSquareElements) {
+      return Promise.resolve();
+    }
+
+    const fromSquare = this.darkSquareElements[move.from];
+    const toSquare = this.darkSquareElements[move.to];
+    if (!fromSquare || !toSquare) {
+      return Promise.resolve();
+    }
+
+    const pieceEl = fromSquare.querySelector('.piece');
+    if (!pieceEl) {
+      return Promise.resolve();
+    }
+
+    const fromCoord = indexToCoord(move.from);
+    const toCoord = indexToCoord(move.to);
+    const dCol = toCoord.col - fromCoord.col;
+    const dRow = toCoord.row - fromCoord.row;
+
+    // Animate capture dissipation on jumped piece
+    if (move.isJump && move.captured !== null && move.captured !== undefined) {
+      const capturedSquare = this.darkSquareElements[move.captured];
+      if (capturedSquare) {
+        const capturedPiece = capturedSquare.querySelector('.piece');
+        if (capturedPiece) {
+          capturedPiece.classList.add('anim-dissipating');
+        }
+      }
+    }
+
+    return new Promise((resolve) => {
+      if (move.isJump) {
+        pieceEl.style.setProperty('--move-dx', `${dCol * 100}%`);
+        pieceEl.style.setProperty('--move-dy', `${dRow * 100}%`);
+        pieceEl.classList.add('anim-hopping');
+        setTimeout(resolve, 250);
+      } else {
+        pieceEl.classList.add('anim-sliding');
+        pieceEl.style.transform = `translate(${dCol * 100}%, ${dRow * 100}%)`;
+        setTimeout(resolve, 200);
+      }
+    });
+  }
+
+  /**
    * Full re-render of the board and scoreboard based on current game state.
    * @param {Object} renderData
    * @param {Object} renderData.state - current state object
@@ -281,7 +346,10 @@ export class CheckersRenderer {
    * @param {Object|null} renderData.lastMove - { from, to }
    * @param {boolean} renderData.mustJump - whether mandatory jump is active
    * @param {string} renderData.message - status message to display
-   * @param {boolean} [renderData.newlyCrownedIndex] - index of piece crowned on this move
+   * @param {number|null} [renderData.newlyCrownedIndex] - index of piece crowned on this move
+   * @param {Object|null} [renderData.stats] - match statistics
+   * @param {string|null} [renderData.winReason] - victory reason
+   * @param {Set<number>} [renderData.preyIndices] - indices of pieces about to be jumped
    */
   render({
     state,
@@ -290,14 +358,17 @@ export class CheckersRenderer {
     lastMove = null,
     mustJump = false,
     message = '',
-    newlyCrownedIndex = null
+    newlyCrownedIndex = null,
+    stats = null,
+    winReason = null,
+    preyIndices = new Set()
   }) {
     // 1. Clear highlights on all dark squares
     for (let i = 0; i < 32; i++) {
       const square = this.darkSquareElements[i];
       if (!square) continue;
 
-      square.classList.remove('valid-dest', 'is-jump-dest', 'last-move-from', 'last-move-to');
+      square.classList.remove('valid-dest', 'is-jump-dest', 'last-move-from', 'last-move-to', 'is-prey-square');
 
       // Clear existing piece element (retaining notation badge)
       const existingPiece = square.querySelector('.piece');
@@ -328,6 +399,15 @@ export class CheckersRenderer {
 
         if (state.selectedSquare === i) {
           pieceEl.classList.add('selected');
+        }
+
+        if (state.mustContinueJumpFrom === i) {
+          pieceEl.classList.add('multi-jump-active');
+        }
+
+        if (preyIndices && preyIndices.has(i)) {
+          pieceEl.classList.add('target-prey');
+          square.classList.add('is-prey-square');
         }
 
         if (newlyCrownedIndex === i) {
@@ -363,12 +443,12 @@ export class CheckersRenderer {
     // 4. Update Scoreboard and Stats
     this._updateStats(state);
 
-    // 5. Update Status Banner
+    // 5. Update Status Banner and Multi-Jump Callout
     this._updateStatus(state, mustJump, message);
 
     // 6. Game Over Modal
     if (state.winner !== null) {
-      this._showGameOver(state);
+      this._showGameOver(state, stats, winReason);
     } else {
       this._hideGameOver();
     }
@@ -444,34 +524,105 @@ export class CheckersRenderer {
         this.turnMessage.classList.remove('thinking');
       }
     }
+
+    // Dynamic Multi-Jump Callout Banner
+    if (this.multiJumpBanner) {
+      if (state.mustContinueJumpFrom !== null) {
+        this.multiJumpBanner.classList.remove('hidden');
+        if (this.multiJumpText) {
+          this.multiJumpText.textContent = 'Capture chain in progress! Complete the remaining jump.';
+        }
+      } else {
+        this.multiJumpBanner.classList.add('hidden');
+      }
+    }
   }
 
-  _showGameOver(state) {
+  _showGameOver(state, stats = null, winReason = null) {
     if (!this.modal) return;
 
-    let title = 'Game Over';
+    let title = 'Victory!';
+    let trophy = '🏆';
+    let badge = 'Victory';
     let msg = '';
 
-    if (state.winner === PLAYER_RED) {
-      title = 'Red Wins!';
-      msg = 'Congratulations! Red has won the game!';
-    } else if (state.winner === PLAYER_BLACK) {
-      title = 'Black Wins!';
-      msg = 'Congratulations! Black has won the game!';
-    } else if (state.winner === 'draw') {
+    const winnerIsRed = state.winner === PLAYER_RED;
+    const winnerName = winnerIsRed ? 'Red' : 'Black';
+    const loserName = winnerIsRed ? 'Black' : 'Red';
+
+    if (state.winner === 'draw') {
       title = 'Draw Game';
-      msg = 'The game has ended in a draw.';
+      trophy = '🤝';
+      badge = '40-Move Rule';
+      msg = '40 full moves (80 turns) were played without a capture or piece advance.';
+    } else if (winReason === 'elimination') {
+      title = `${winnerName} Victory!`;
+      trophy = '🏆';
+      badge = 'Elimination';
+      msg = `Outstanding match! ${winnerName} captured all opposing pieces.`;
+    } else if (winReason === 'trapped') {
+      title = `${winnerName} Victory!`;
+      trophy = '👑';
+      badge = 'No Legal Moves';
+      msg = `${loserName} was completely trapped with no legal moves remaining.`;
+    } else {
+      title = `${winnerName} Wins!`;
+      trophy = '🏆';
+      badge = 'Victory';
+      msg = `Congratulations! ${winnerName} has won the match!`;
     }
 
     if (this.modalTitle) this.modalTitle.textContent = title;
+    if (this.modalTrophy) this.modalTrophy.textContent = trophy;
+    if (this.modalReasonBadge) this.modalReasonBadge.textContent = badge;
     if (this.modalMessage) this.modalMessage.textContent = msg;
 
+    if (stats) {
+      if (this.modalStatTurns) this.modalStatTurns.textContent = String(stats.turnCount || 0);
+      if (this.modalStatRedCaptures) this.modalStatRedCaptures.textContent = String(stats.redCaptures || 0);
+      if (this.modalStatBlackCaptures) this.modalStatBlackCaptures.textContent = String(stats.blackCaptures || 0);
+      if (this.modalStatKings) {
+        this.modalStatKings.textContent = `${(stats.redKingsCrowned || 0) + (stats.blackKingsCrowned || 0)} (${stats.redKingsCrowned || 0} Red, ${stats.blackKingsCrowned || 0} Black)`;
+      }
+      if (this.modalStatTime) {
+        const elapsed = stats.startTime ? Math.max(0, Math.floor((Date.now() - stats.startTime) / 1000)) : 0;
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
+        this.modalStatTime.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+      }
+    }
+
     this.modal.classList.remove('hidden');
+    if (this.btnReopenModal) {
+      this.btnReopenModal.classList.add('hidden');
+    }
+  }
+
+  hideModalForReview() {
+    if (this.modal) {
+      this.modal.classList.add('hidden');
+    }
+    if (this.btnReopenModal) {
+      this.btnReopenModal.classList.remove('hidden');
+    }
+  }
+
+  showReviewRecap() {
+    if (this.modal) {
+      this.modal.classList.remove('hidden');
+    }
+    if (this.btnReopenModal) {
+      this.btnReopenModal.classList.add('hidden');
+    }
   }
 
   _hideGameOver() {
     if (this.modal) {
       this.modal.classList.add('hidden');
     }
+    if (this.btnReopenModal) {
+      this.btnReopenModal.classList.add('hidden');
+    }
   }
 }
+

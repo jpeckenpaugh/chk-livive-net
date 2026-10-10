@@ -87,19 +87,66 @@
       </div>
     </section>
 
+    <!-- Multi-Jump Dynamic Callout Banner -->
+    <div id="multijump-banner" class="multijump-banner hidden" role="status" aria-live="polite">
+      <span class="multijump-pill">⚡ Multi-Jump</span>
+      <span id="multijump-text" class="multijump-text">Capture chain in progress! Complete the jump.</span>
+    </div>
+
     <!-- Checkers Board Area -->
     <main class="board-wrapper">
       <div id="board" class="board" role="grid" aria-label="Checkers Board"></div>
     </main>
 
+    <!-- Floating Re-open Recap Pill (when reviewing board) -->
+    <button id="btn-reopen-modal" class="reopen-modal-pill hidden" title="View Match Recap">
+      🏆 View Match Recap
+    </button>
+
+    <!-- Keyboard Shortcuts Legend Footer -->
+    <footer class="keyboard-legend" aria-label="Keyboard Shortcuts">
+      <span class="legend-item"><kbd>Esc</kbd> Deselect</span>
+      <span class="legend-item"><kbd>R</kbd> New Game</span>
+      <span class="legend-item"><kbd>M</kbd> Mute</span>
+      <span class="legend-item"><kbd>N</kbd> Numbers</span>
+      <span class="legend-item"><kbd>F</kbd> Flip</span>
+    </footer>
+
     <!-- Game Over Modal Overlay -->
     <div id="game-over-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-card">
-        <div class="modal-trophy">🏆</div>
+        <div id="modal-trophy" class="modal-trophy">🏆</div>
         <h2 id="modal-title" class="modal-title">Victory!</h2>
-        <p id="modal-message" class="modal-message">Red has won the game!</p>
+        <div id="modal-reason-badge" class="modal-reason-badge">Elimination</div>
+        <p id="modal-message" class="modal-message">Red has captured all opposing pieces!</p>
+
+        <!-- Match Stats Recap Grid -->
+        <div class="modal-stats-grid">
+          <div class="modal-stat-card">
+            <span class="stat-label">Total Turns</span>
+            <span class="stat-value" id="modal-stat-turns">0</span>
+          </div>
+          <div class="modal-stat-card">
+            <span class="stat-label">Match Time</span>
+            <span class="stat-value" id="modal-stat-time">0:00</span>
+          </div>
+          <div class="modal-stat-card">
+            <span class="stat-label">Red Captures</span>
+            <span class="stat-value" id="modal-stat-red-captures">0</span>
+          </div>
+          <div class="modal-stat-card">
+            <span class="stat-label">Black Captures</span>
+            <span class="stat-value" id="modal-stat-black-captures">0</span>
+          </div>
+          <div class="modal-stat-card stat-card-wide">
+            <span class="stat-label">Kings Crowned</span>
+            <span class="stat-value" id="modal-stat-kings">0</span>
+          </div>
+        </div>
+
         <div class="modal-actions">
           <button id="btn-modal-restart" class="btn btn-primary btn-large">Play Again</button>
+          <button id="btn-modal-review" class="btn btn-secondary btn-large">Review Board</button>
         </div>
       </div>
     </div>
@@ -108,3 +155,4 @@
   <script type="module" src="src/main.js"></script>
 </body>
 </html>
+

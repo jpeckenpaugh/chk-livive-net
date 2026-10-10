@@ -517,13 +517,212 @@ body {
 
 /* ==========================================================================
    Game Over Modal
+/* ==========================================================================
+   Tactile & Animated Checkers Pieces
+   ========================================================================== */
+
+/* Multi-jump active piece pulse */
+.piece.multi-jump-active {
+  animation: multi-jump-pulse 0.9s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 25;
+}
+
+@keyframes multi-jump-pulse {
+  0% {
+    box-shadow: 0 0 0 3px #f5b041, 0 0 10px rgba(245, 176, 65, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 6px #e74c3c, 0 0 20px rgba(231, 76, 60, 0.9);
+    transform: scale(1.08);
+  }
+}
+
+/* Prey Target Highlighting (pieces about to be jumped) */
+.piece.target-prey {
+  animation: prey-pulse 0.9s infinite alternate ease-in-out;
+}
+
+@keyframes prey-pulse {
+  0% {
+    box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 5px rgba(231, 76, 60, 1), 0 0 16px rgba(231, 76, 60, 0.9);
+  }
+}
+
+.square.is-prey-square::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 2px dashed rgba(231, 76, 60, 0.85);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 4;
+  animation: rotate-prey 4s linear infinite;
+}
+
+@keyframes rotate-prey {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Move & Jump Animations */
+.piece.anim-sliding {
+  transition: transform 200ms cubic-bezier(0.25, 1, 0.5, 1) !important;
+  z-index: 30;
+}
+
+.piece.anim-hopping {
+  animation: piece-hop 250ms cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+  z-index: 35;
+}
+
+@keyframes piece-hop {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(calc(var(--move-dx, 0px) * 0.5), calc(var(--move-dy, 0px) * 0.5)) scale(1.25);
+    box-shadow: 0 16px 26px rgba(0, 0, 0, 0.65), 0 0 14px var(--gold-glow);
+  }
+  100% {
+    transform: translate(var(--move-dx, 0px), var(--move-dy, 0px)) scale(1);
+  }
+}
+
+/* Capture Dissipation Animation */
+.piece.anim-dissipating {
+  animation: capture-dissipate 200ms ease-out forwards !important;
+  pointer-events: none;
+  z-index: 15;
+}
+
+@keyframes capture-dissipate {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    filter: brightness(1);
+  }
+  40% {
+    transform: scale(1.15) rotate(12deg);
+    opacity: 0.85;
+    filter: brightness(1.3);
+  }
+  100% {
+    transform: scale(0) rotate(-25deg);
+    opacity: 0;
+    filter: brightness(0.2);
+  }
+}
+
+/* Dynamic Multi-Jump Callout Banner */
+.multijump-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: var(--board-max-size);
+  padding: 8px 14px;
+  background: rgba(192, 57, 43, 0.22);
+  border: 1px solid rgba(231, 76, 60, 0.6);
+  border-radius: 8px;
+  color: #ffcdd2;
+  font-size: 0.88rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  animation: fade-in 0.2s ease;
+}
+
+.multijump-pill {
+  background: #c0392b;
+  color: #fff;
+  padding: 2px 9px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.multijump-text {
+  flex: 1;
+  text-align: left;
+}
+
+/* Floating Re-open Recap Pill */
+.reopen-modal-pill {
+  position: fixed;
+  bottom: 22px;
+  right: 22px;
+  z-index: 80;
+  background: #b54a24;
+  color: #fff;
+  border: 1px solid var(--gold-accent);
+  border-radius: 24px;
+  padding: 10px 18px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55), 0 0 12px rgba(245, 176, 65, 0.4);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.reopen-modal-pill:hover {
+  transform: translateY(-2px) scale(1.03);
+  background: #cb562d;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65), 0 0 18px rgba(245, 176, 65, 0.6);
+}
+
+/* Keyboard Shortcuts Legend */
+.keyboard-legend {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  user-select: none;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+kbd {
+  background: #2b2521;
+  border: 1px solid #4d3d34;
+  border-bottom: 2px solid #362a22;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-main);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* ==========================================================================
+   Game Over Modal
    ========================================================================== */
 
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -535,36 +734,114 @@ body {
 .modal-card {
   background: #25201c;
   border: 2px solid var(--gold-accent);
-  border-radius: 12px;
-  padding: 28px 36px;
+  border-radius: 14px;
+  padding: 26px 32px;
   text-align: center;
-  max-width: 380px;
+  max-width: 400px;
   width: 100%;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 24px rgba(245, 176, 65, 0.3);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85), 0 0 28px rgba(245, 176, 65, 0.35);
   animation: scale-up 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
 }
 
 .modal-trophy {
   font-size: 3rem;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+  animation: trophy-bounce 0.6s ease;
+}
+
+@keyframes trophy-bounce {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.18); opacity: 1; }
+  100% { transform: scale(1); }
 }
 
 .modal-title {
   font-size: 1.6rem;
   font-weight: 700;
   color: var(--gold-accent);
+  margin-bottom: 6px;
+}
+
+.modal-reason-badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 12px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
   margin-bottom: 8px;
+  background: rgba(245, 176, 65, 0.18);
+  border: 1px solid var(--gold-accent);
+  color: var(--gold-accent);
 }
 
 .modal-message {
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: var(--text-main);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+/* Modal Stats Recap Grid */
+.modal-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
   margin-bottom: 22px;
+  text-align: left;
+}
+
+.modal-stat-card {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-card-wide {
+  grid-column: span 2;
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 1.18rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--panel-border);
+  color: var(--text-main);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: #6d5b4e;
 }
 
 .btn-large {
-  font-size: 1rem;
-  padding: 10px 24px;
+  font-size: 0.95rem;
+  padding: 9px 20px;
+  flex: 1;
 }
 
 @keyframes fade-in {
@@ -575,6 +852,12 @@ body {
 @keyframes scale-up {
   from { transform: scale(0.85); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
+}
+
+/* Touch & Mobile Optimizations */
+html, body, .board, .square, .piece, .btn, .select-control {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* ==========================================================================
@@ -615,4 +898,13 @@ body {
   .btn-primary {
     display: inline-flex;
   }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .keyboard-legend {
+    display: none;
+  }
 }
+
