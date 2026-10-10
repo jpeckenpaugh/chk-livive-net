@@ -18,6 +18,8 @@ import {
   checkGameOver
 } from './rules.js';
 
+import { CheckersAI } from './ai.js';
+
 export class CheckersController {
   /**
    * @param {import('./renderer.js').CheckersRenderer} renderer
@@ -29,10 +31,15 @@ export class CheckersController {
     this.lastMove = null;
     this.statusMessage = '';
 
-    // Player types: 'human' or 'ai'. Prepared for Milestone 3 AI integration.
+    // Game Mode: 'ai' (Play vs AI) or 'pvp' (Pass & Play)
+    this.gameMode = 'ai';
+    this.difficulty = 'medium';
+
+    // Player types: 'human' or 'ai'.
+    // In 'ai' mode, Human is Red (1) and AI is Black (-1).
     this.playerTypes = {
       [PLAYER_RED]: 'human',
-      [PLAYER_BLACK]: 'human'
+      [PLAYER_BLACK]: 'ai'
     };
 
     // UI Preferences
@@ -40,8 +47,11 @@ export class CheckersController {
     this.boardFlipped = false;
     this.soundMuted = false;
 
-    // AI hook placeholder (to be registered by Milestone 3 ai.js)
-    this.aiAgent = null;
+    // AI Engine instance
+    this.aiAgent = new CheckersAI(this.difficulty);
+
+    // AI turn timeout reference to prevent overlapping runs
+    this.aiTimeoutId = null;
   }
 
   /**
@@ -84,6 +94,18 @@ export class CheckersController {
       const btnMute = document.getElementById('btn-mute');
       if (btnMute) {
         btnMute.addEventListener('click', () => this.toggleMute());
+      }
+
+      const selectMode = document.getElementById('select-game-mode');
+      if (selectMode) {
+        selectMode.value = this.gameMode;
+        selectMode.addEventListener('change', (e) => this.setGameMode(e.target.value));
+      }
+
+      const selectDifficulty = document.getElementById('select-difficulty');
+      if (selectDifficulty) {
+        selectDifficulty.value = this.difficulty;
+        selectDifficulty.addEventListener('change', (e) => this.setDifficulty(e.target.value));
       }
     }
 
@@ -225,24 +247,77 @@ export class CheckersController {
 
     this.updateView(crowned ? move.to : null);
 
-    // If turn switched and next player is AI, schedule AI turn
+    // If turn switched or continues to AI, schedule AI turn
     if (this.state.winner === null && this.playerTypes[this.state.turn] === 'ai') {
       this.scheduleAiTurn();
     }
   }
 
   /**
-   * Hook for AI turn execution (Milestone 3).
+   * Schedules AI move execution with natural delay and status indicator.
+   * Uses 300ms pacing for both normal moves and chained jumps.
    */
   scheduleAiTurn() {
     if (!this.aiAgent) return;
-    setTimeout(() => {
+    if (this.aiTimeoutId !== null) {
+      clearTimeout(this.aiTimeoutId);
+      this.aiTimeoutId = null;
+    }
+
+    this.statusMessage = 'AI is thinking...';
+    this.updateView();
+
+    this.aiTimeoutId = setTimeout(() => {
+      this.aiTimeoutId = null;
       if (this.state.winner !== null) return;
+      if (this.playerTypes[this.state.turn] !== 'ai') return;
+
       const move = this.aiAgent.getBestMove(this.state);
       if (move) {
         this.executeMove(move);
       }
-    }, 350);
+    }, 300);
+  }
+
+  /**
+   * Sets game mode: 'ai' (Play vs AI) or 'pvp' (Pass & Play).
+   * @param {string} mode
+   */
+  setGameMode(mode) {
+    this.gameMode = mode;
+    if (mode === 'ai') {
+      this.playerTypes[PLAYER_RED] = 'human';
+      this.playerTypes[PLAYER_BLACK] = 'ai';
+    } else {
+      this.playerTypes[PLAYER_RED] = 'human';
+      this.playerTypes[PLAYER_BLACK] = 'human';
+    }
+
+    // Toggle difficulty selector visibility if in DOM
+    if (typeof document !== 'undefined') {
+      const selectDifficulty = document.getElementById('select-difficulty');
+      if (selectDifficulty) {
+        selectDifficulty.style.display = mode === 'ai' ? 'inline-block' : 'none';
+      }
+    }
+
+    // If active turn is now AI, schedule AI move
+    if (this.state.winner === null && this.playerTypes[this.state.turn] === 'ai') {
+      this.scheduleAiTurn();
+    } else {
+      this.updateView();
+    }
+  }
+
+  /**
+   * Sets AI difficulty level: 'easy', 'medium', or 'hard'.
+   * @param {string} diff
+   */
+  setDifficulty(diff) {
+    this.difficulty = diff;
+    if (this.aiAgent) {
+      this.aiAgent.setDifficulty(diff);
+    }
   }
 
   /**
@@ -250,7 +325,8 @@ export class CheckersController {
    * @param {number|null} [newlyCrownedIndex=null]
    */
   updateView(newlyCrownedIndex = null) {
-    const legalMoves = this.state.winner !== null
+    const isAiTurn = this.playerTypes[this.state.turn] === 'ai';
+    const legalMoves = (this.state.winner !== null || isAiTurn)
       ? []
       : getLegalMoves(this.state.board, this.state.turn, this.state.mustContinueJumpFrom);
 
@@ -277,10 +353,18 @@ export class CheckersController {
    * Resets game to starting position.
    */
   resetGame() {
+    if (this.aiTimeoutId !== null) {
+      clearTimeout(this.aiTimeoutId);
+      this.aiTimeoutId = null;
+    }
     this.state = createInitialState();
     this.lastMove = null;
     this.statusMessage = '';
     this.updateView();
+
+    if (this.playerTypes[this.state.turn] === 'ai') {
+      this.scheduleAiTurn();
+    }
   }
 
   /**

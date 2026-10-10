@@ -133,6 +133,35 @@ body {
   border-color: #a4401a;
 }
 
+.control-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.select-control {
+  font-size: 0.84rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  color: var(--text-main);
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.select-control:hover, .select-control:focus {
+  background: #3e332c;
+  border-color: #8c3514;
+}
+
+.select-control option {
+  background: #24201d;
+  color: #f5ede0;
+}
+
 .btn-icon {
   padding: 7px 10px;
 }
@@ -144,6 +173,18 @@ body {
 
 .hidden {
   display: none !important;
+}
+
+@keyframes pulse-thinking {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; text-shadow: 0 0 6px rgba(245, 176, 65, 0.6); }
+  100% { opacity: 0.5; }
+}
+
+.turn-message.thinking {
+  color: var(--gold-accent);
+  font-weight: 700;
+  animation: pulse-thinking 1.2s infinite ease-in-out;
 }
 
 /* ==========================================================================

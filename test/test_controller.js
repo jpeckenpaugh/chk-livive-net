@@ -185,3 +185,53 @@ test('Controller - Reset Game', (t) => {
   assert.equal(controller.state.board[17], EMPTY);
   assert.equal(controller.lastMove, null);
 });
+
+test('Controller - AI Mode & Difficulty Configuration', (t) => {
+  const mockRenderer = createMockRenderer();
+  const controller = new CheckersController(mockRenderer);
+
+  // Defaults to AI mode: Red is human, Black is AI
+  assert.equal(controller.gameMode, 'ai');
+  assert.equal(controller.playerTypes[PLAYER_RED], 'human');
+  assert.equal(controller.playerTypes[PLAYER_BLACK], 'ai');
+  assert.equal(controller.difficulty, 'medium');
+
+  // Change difficulty
+  controller.setDifficulty('hard');
+  assert.equal(controller.difficulty, 'hard');
+  assert.equal(controller.aiAgent.difficulty, 'hard');
+
+  // Switch to Pass & Play
+  controller.setGameMode('pvp');
+  assert.equal(controller.gameMode, 'pvp');
+  assert.equal(controller.playerTypes[PLAYER_RED], 'human');
+  assert.equal(controller.playerTypes[PLAYER_BLACK], 'human');
+
+  // Switch back to AI mode
+  controller.setGameMode('ai');
+  assert.equal(controller.gameMode, 'ai');
+  assert.equal(controller.playerTypes[PLAYER_BLACK], 'ai');
+});
+
+test('Controller - AI Auto Move Scheduling and Execution', async (t) => {
+  const mockRenderer = createMockRenderer();
+  const controller = new CheckersController(mockRenderer);
+  controller.init();
+
+  // Red makes first opening move: 21 -> 17
+  controller.handleSquareClick(21);
+  controller.handleSquareClick(17);
+
+  assert.equal(controller.state.turn, PLAYER_BLACK);
+  assert.match(controller.statusMessage, /AI is thinking/i);
+  assert.ok(controller.aiTimeoutId !== null, 'AI move should be scheduled with a timeout');
+
+  // Wait for AI to execute move (300ms delay + small margin)
+  await new Promise((resolve) => setTimeout(resolve, 380));
+
+  // AI (Black) should have completed its move and passed turn back to Red
+  assert.equal(controller.state.turn, PLAYER_RED);
+  assert.ok(controller.lastMove !== null);
+  // One of Black's row 2 pieces (8, 9, 10, 11) should have moved
+  assert.ok([8, 9, 10, 11].includes(controller.lastMove.from));
+});

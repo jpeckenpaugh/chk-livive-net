@@ -423,16 +423,25 @@ export class CheckersRenderer {
     if (this.turnMessage) {
       if (customMessage) {
         this.turnMessage.textContent = customMessage;
-        this.turnMessage.classList.add('alert');
+        if (/thinking/i.test(customMessage)) {
+          this.turnMessage.classList.add('thinking');
+          this.turnMessage.classList.remove('alert');
+        } else {
+          this.turnMessage.classList.add('alert');
+          this.turnMessage.classList.remove('thinking');
+        }
       } else if (state.mustContinueJumpFrom !== null) {
         this.turnMessage.textContent = 'Multi-jump! You must continue the capture chain.';
         this.turnMessage.classList.add('alert');
+        this.turnMessage.classList.remove('thinking');
       } else if (mustJump) {
         this.turnMessage.textContent = 'Capture available! Mandatory jump required.';
         this.turnMessage.classList.add('alert');
+        this.turnMessage.classList.remove('thinking');
       } else {
         this.turnMessage.textContent = 'Select a piece to move.';
         this.turnMessage.classList.remove('alert');
+        this.turnMessage.classList.remove('thinking');
       }
     }
   }

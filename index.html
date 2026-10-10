@@ -12,6 +12,17 @@
     <header class="game-header">
       <h1 class="game-title">Classic Checkers</h1>
       <div class="header-controls">
+        <div class="control-group">
+          <select id="select-game-mode" class="select-control" aria-label="Game Mode" title="Game Mode">
+            <option value="ai" selected>Play vs AI</option>
+            <option value="pvp">Pass & Play</option>
+          </select>
+          <select id="select-difficulty" class="select-control" aria-label="AI Difficulty" title="AI Difficulty">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
         <button id="btn-rotate" class="btn btn-icon" title="Rotate Board" aria-label="Rotate Board">
           <svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
