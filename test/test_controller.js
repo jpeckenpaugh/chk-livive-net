@@ -190,8 +190,8 @@ test('Controller - AI Mode & Difficulty Configuration', (t) => {
   const mockRenderer = createMockRenderer();
   const controller = new CheckersController(mockRenderer);
 
-  // Defaults to AI mode: Red is human, Black is AI
-  assert.equal(controller.gameMode, 'ai');
+  // Initial mode is minimax (or legacy ai)
+  assert.ok(controller.gameMode === 'minimax' || controller.gameMode === 'ai');
   assert.equal(controller.playerTypes[PLAYER_RED], 'human');
   assert.equal(controller.playerTypes[PLAYER_BLACK], 'ai');
   assert.equal(controller.difficulty, 'medium');
@@ -201,15 +201,25 @@ test('Controller - AI Mode & Difficulty Configuration', (t) => {
   assert.equal(controller.difficulty, 'hard');
   assert.equal(controller.aiAgent.difficulty, 'hard');
 
+  // Switch to LLM mode
+  controller.setGameMode('llm');
+  assert.equal(controller.gameMode, 'llm');
+  assert.equal(controller.players[PLAYER_BLACK].type, 'llm');
+
   // Switch to Pass & Play
   controller.setGameMode('pvp');
   assert.equal(controller.gameMode, 'pvp');
   assert.equal(controller.playerTypes[PLAYER_RED], 'human');
   assert.equal(controller.playerTypes[PLAYER_BLACK], 'human');
 
-  // Switch back to AI mode
+  // Switch back to Minimax mode
+  controller.setGameMode('minimax');
+  assert.equal(controller.gameMode, 'minimax');
+  assert.equal(controller.playerTypes[PLAYER_BLACK], 'ai');
+
+  // Legacy 'ai' mode alias
   controller.setGameMode('ai');
-  assert.equal(controller.gameMode, 'ai');
+  assert.ok(controller.gameMode === 'ai' || controller.gameMode === 'minimax');
   assert.equal(controller.playerTypes[PLAYER_BLACK], 'ai');
 });
 

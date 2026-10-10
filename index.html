@@ -17,9 +17,10 @@
       <div class="header-controls">
         <div class="control-group">
           <select id="select-game-mode" class="select-control" aria-label="Game Mode" title="Game Mode">
-            <option value="ai" selected>Play vs AI</option>
-            <option value="pvp">Pass & Play</option>
-            <option value="arena">AI vs AI Arena</option>
+            <option value="llm">Play vs LLM AI (Chat & Banter)</option>
+            <option value="minimax" selected>Play vs Minimax (Classic AI)</option>
+            <option value="pvp">Pass & Play (2 Player)</option>
+            <option value="arena">AI vs AI Arena (Spectator)</option>
           </select>
           <select id="select-difficulty" class="select-control" aria-label="AI Difficulty" title="AI Difficulty">
             <option value="easy">Easy</option>
@@ -27,6 +28,10 @@
             <option value="hard">Hard</option>
           </select>
         </div>
+        <button id="btn-open-llm-dashboard" class="btn btn-secondary" title="WebGPU Hardware Status & LLM Manager" aria-label="LLM Dashboard">
+          <span class="btn-icon-symbol">🧠</span>
+          <span class="btn-text">LLM Dashboard</span>
+        </button>
         <button id="btn-arena-setup" class="btn btn-secondary" title="Configure Players & Personas" aria-label="Arena Setup">
           <span class="btn-icon-symbol">⚔️</span>
           <span class="btn-text">Matchup Setup</span>
@@ -302,6 +307,106 @@
         <div class="modal-actions">
           <button id="btn-modal-restart" class="btn btn-primary btn-large">Play Again</button>
           <button id="btn-modal-review" class="btn btn-secondary btn-large">Review Board</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LLM Dashboard Modal Overlay -->
+    <div id="modal-llm-dashboard" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="llm-dashboard-title">
+      <div class="modal-card modal-dashboard-card">
+        <div class="modal-header-row">
+          <div class="brand-group">
+            <h2 id="llm-dashboard-title" class="modal-title">🧠 LLM Dashboard</h2>
+            <span class="arena-tag">Engine & Diagnostics</span>
+          </div>
+          <button id="btn-close-llm-dashboard" class="btn btn-icon btn-sm" aria-label="Close Dashboard" title="Close">✕</button>
+        </div>
+
+        <div class="dashboard-grid">
+          <!-- 1. Hardware & WebGPU Status Card -->
+          <div class="dashboard-card" id="card-hardware-status">
+            <div class="dashboard-card-header">
+              <span class="card-icon">⚡</span>
+              <h3 class="card-title">Hardware & WebGPU Status</h3>
+              <span id="llm-gpu-badge" class="status-badge status-badge-pending">Checking...</span>
+            </div>
+            <div class="dashboard-card-body">
+              <div class="info-row">
+                <span class="info-label">Active Adapter:</span>
+                <span id="llm-gpu-adapter-name" class="info-val font-mono">Scanning...</span>
+              </div>
+              <p id="llm-gpu-notes" class="info-notes">Detecting WebGPU hardware acceleration...</p>
+            </div>
+          </div>
+
+          <!-- 2. Model Manager Card -->
+          <div class="dashboard-card" id="card-model-manager">
+            <div class="dashboard-card-header">
+              <span class="card-icon">📦</span>
+              <h3 class="card-title">Model Manager</h3>
+            </div>
+            <div class="dashboard-card-body">
+              <div class="form-group">
+                <label for="llm-select-model">Model Repository:</label>
+                <select id="llm-select-model" class="select-control full-width">
+                  <!-- Populated via model_registry.js -->
+                </select>
+              </div>
+
+              <div class="model-meta-badges">
+                <span id="llm-model-vram" class="meta-badge">VRAM: ~1.1 GB</span>
+                <span id="llm-model-download" class="meta-badge">Size: ~950 MB</span>
+              </div>
+              <p id="llm-model-desc" class="info-notes">Great tactical move reasoning and sharp, lively banter.</p>
+
+              <div class="model-actions-row">
+                <button id="btn-llm-load-model" class="btn btn-primary btn-sm">⬇ Load Model</button>
+                <button id="btn-llm-clear-cache" class="btn btn-secondary btn-sm" title="Clear Cache API & IndexedDB">🗑 Clear Cache</button>
+              </div>
+
+              <!-- Real-time Loading Progress -->
+              <div id="llm-load-progress-container" class="dashboard-progress-container hidden">
+                <div class="progress-bar-header">
+                  <span id="llm-load-progress-label" class="progress-label">Downloading weights...</span>
+                </div>
+                <div class="progress-track">
+                  <div id="llm-load-progress-fill" class="progress-fill" style="width: 0%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Interactive Test Bench -->
+          <div class="dashboard-card dashboard-card-wide" id="card-test-bench">
+            <div class="dashboard-card-header">
+              <span class="card-icon">🧪</span>
+              <h3 class="card-title">Interactive Test Bench</h3>
+              <span id="llm-testbench-metrics" class="testbench-metrics">Ready</span>
+            </div>
+            <div class="dashboard-card-body">
+              <div class="testbench-actions">
+                <button id="btn-llm-test-chat" class="btn btn-secondary btn-sm">💬 Test Chat & Banter</button>
+                <button id="btn-llm-test-move" class="btn btn-secondary btn-sm">♟️ Test Tactical Move</button>
+              </div>
+              <div class="console-box">
+                <pre id="llm-testbench-output" class="console-output">Load a model above or click test buttons to inspect real-time outputs.</pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Live Activity & Diagnostics Log -->
+          <div class="dashboard-card dashboard-card-wide" id="card-activity-log">
+            <div class="dashboard-card-header">
+              <span class="card-icon">📜</span>
+              <h3 class="card-title">Live Activity Log</h3>
+              <button id="btn-llm-clear-log" class="btn btn-sm btn-icon" title="Clear Log">Clear</button>
+            </div>
+            <div class="dashboard-card-body">
+              <div id="llm-activity-log" class="console-box console-log-box">
+                <div class="log-entry log-entry-info"><span class="log-time">[System]</span> LLM Dashboard initialized.</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -27,6 +27,7 @@ import { HumanPlayer } from './players/human_player.js';
 import { MinimaxPlayer } from './players/minimax_player.js';
 import { LLMPlayer } from './players/llm_player.js';
 import { webLLMService } from './llm/web_llm_service.js';
+import { checkWebGPUSupport } from './llm/gpu_check.js';
 import { formatMoveDescription } from './llm/prompts.js';
 import { DEFAULT_MODEL_ID } from './llm/model_registry.js';
 import { DEFAULT_PERSONA_RED, DEFAULT_PERSONA_BLACK } from './llm/personas.js';
@@ -57,8 +58,8 @@ export class CheckersController {
     this.winReason = null;
     this.isAnimating = false;
 
-    // Game Mode: 'ai' (Play vs AI), 'pvp' (Pass & Play), or 'arena' (Model vs Model)
-    this.gameMode = 'ai';
+    // Game Mode: 'llm', 'minimax', 'pvp', or 'arena' (legacy 'ai' maps to 'minimax' or 'llm')
+    this.gameMode = 'minimax';
     this.difficulty = 'medium';
 
     // Model & Tactical settings
@@ -214,12 +215,37 @@ export class CheckersController {
       window.addEventListener('keydown', (e) => this.handleKeyDown(e));
     }
 
-    // 5. Initial render
+    // 5. Initial hardware & WebGPU check to configure initial default game mode
+    this._checkWebGPUAndSetInitialMode();
+
+    // 6. Initial render
     this.updateView();
 
     // Check if initial turn belongs to automated player
     if (!this.players[this.state.turn].isInteractive) {
       this.scheduleAutomatedTurn();
+    }
+  }
+
+  /**
+   * Evaluates WebGPU support and sets the initial game mode:
+   * Defaults to 'llm' if WebGPU is supported, or 'minimax' with notice if not.
+   * @private
+   */
+  async _checkWebGPUAndSetInitialMode() {
+    try {
+      const gpuResult = await checkWebGPUSupport();
+      if (gpuResult.supported) {
+        // WebGPU is supported: default to LLM AI mode
+        this.setGameMode('llm', false);
+      } else {
+        // WebGPU is not supported: set to Minimax with status notice
+        this.setGameMode('minimax', false);
+        this.statusMessage = 'WebGPU not detected; using Minimax (Classic AI).';
+        this.updateView();
+      }
+    } catch (e) {
+      this.setGameMode('minimax', false);
     }
   }
 
@@ -802,10 +828,28 @@ export class CheckersController {
         this.executeMove(chosenMove);
       } catch (err) {
         if (!currentSignal.aborted) {
+          const reason = err.message || 'Move calculation failed';
           console.error(`[Controller] Error during ${activePlayer.name}'s move:`, err);
-          // Safety fallback: execute first legal move to keep game running
+
+          // Update turn message banner with explicit failure reason
+          const errorBanner = `⚠️ LLM error: ${reason}. Fallback move executed.`;
+          this.statusMessage = errorBanner;
+          if (this.renderer && this.renderer.turnMessage) {
+            this.renderer.turnMessage.textContent = errorBanner;
+          }
+
+          // Log error to WebLLM service / Dashboard activity log
+          webLLMService._log(`[Controller] ${activePlayer.name} error: ${reason}. Executing fallback move.`, 'error');
+
+          // Fallback move: execute first legal move (or minimax move) to keep game alive
           if (legalMoves.length > 0) {
             this.executeMove(legalMoves[0]);
+          }
+
+          // Retain explicit banner after fallback move finalizes
+          this.statusMessage = errorBanner;
+          if (this.renderer && this.renderer.turnMessage) {
+            this.renderer.turnMessage.textContent = errorBanner;
           }
         }
       }
@@ -813,13 +857,27 @@ export class CheckersController {
   }
 
   /**
-   * Sets game mode: 'ai' (Play vs AI), 'pvp' (Pass & Play), or 'arena' (Model vs Model).
+   * Sets game mode:
+   * - 'llm': Play vs LLM AI (Chat & Banter)
+   * - 'minimax': Play vs Minimax (Classic AI)
+   * - 'pvp': Pass & Play (2 Player)
+   * - 'arena': AI vs AI Arena (Spectator)
    * @param {string} mode
+   * @param {boolean} [shouldReset=true]
    */
-  setGameMode(mode) {
+  setGameMode(mode, shouldReset = true) {
     this.gameMode = mode;
 
-    if (mode === 'ai') {
+    if (mode === 'llm') {
+      this.setPlayer(PLAYER_RED, new HumanPlayer({ id: 'player-red', name: 'Red', color: PLAYER_RED }));
+      this.setPlayer(PLAYER_BLACK, new LLMPlayer({
+        id: 'player-black',
+        color: PLAYER_BLACK,
+        personaId: DEFAULT_PERSONA_BLACK,
+        modelId: this.modelId,
+        tacticalMode: this.tacticalMode
+      }));
+    } else if (mode === 'minimax' || mode === 'ai') {
       this.setPlayer(PLAYER_RED, new HumanPlayer({ id: 'player-red', name: 'Red', color: PLAYER_RED }));
       this.setPlayer(PLAYER_BLACK, new MinimaxPlayer({
         id: 'player-black',
@@ -848,15 +906,21 @@ export class CheckersController {
       this.spectatorState = 'playing';
     }
 
-    // Toggle difficulty selector visibility if in DOM
+    // Toggle difficulty selector visibility if in DOM (only needed for minimax/ai)
     if (typeof document !== 'undefined') {
       const selectDifficulty = document.getElementById('select-difficulty');
       if (selectDifficulty) {
-        selectDifficulty.style.display = mode === 'ai' ? 'inline-block' : 'none';
+        selectDifficulty.style.display = (mode === 'minimax' || mode === 'ai') ? 'inline-block' : 'none';
+      }
+      const selectMode = document.getElementById('select-game-mode');
+      if (selectMode && selectMode.value !== mode) {
+        selectMode.value = mode;
       }
     }
 
-    this.resetGame();
+    if (shouldReset) {
+      this.resetGame();
+    }
   }
 
   /**

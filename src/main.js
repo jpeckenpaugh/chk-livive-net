@@ -6,6 +6,7 @@
 
 import { CheckersRenderer } from './renderer.js';
 import { CheckersController } from './controller.js';
+import { LLMDashboard } from './llm/dashboard.js';
 
 window.addEventListener('DOMContentLoaded', () => {
   const boardElement = document.getElementById('board');
@@ -18,9 +19,13 @@ window.addEventListener('DOMContentLoaded', () => {
   const controller = new CheckersController(renderer);
   controller.init();
 
+  const dashboard = new LLMDashboard();
+  dashboard.init();
+
   // Expose controller globally for debugging or automated testing if needed
   window.__checkers = {
     renderer,
-    controller
+    controller,
+    dashboard
   };
 });
