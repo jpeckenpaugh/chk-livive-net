@@ -1,0 +1,12 @@
+{
+  "name": "godot-checkers",
+  "version": "1.0.0",
+  "description": "Client-side, zero-dependency browser-based Checkers (English Draughts)",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/test_rules.js"
+  },
+  "keywords": ["checkers", "draughts", "game", "browser"],
+  "author": "",
+  "license": "MIT"
+}
