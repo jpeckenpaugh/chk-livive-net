@@ -202,6 +202,29 @@ export class CheckersRenderer {
     this.soundOffIcon = document.getElementById('icon-sound-off');
     this.soundLabel = document.getElementById('sound-label');
 
+    // Arena and LLM Banter elements
+    this.speechBubbleRed = document.getElementById('speech-bubble-red');
+    this.speechBubbleBlack = document.getElementById('speech-bubble-black');
+    this.playerRedNameEl = document.getElementById('player-red-name');
+    this.playerBlackNameEl = document.getElementById('player-black-name');
+    this.playerRedAvatarEl = document.getElementById('player-red-avatar');
+    this.playerBlackAvatarEl = document.getElementById('player-black-avatar');
+
+    this.arenaFeedSection = document.getElementById('arena-feed-section');
+    this.arenaFeedList = document.getElementById('arena-feed-list');
+
+    this.webLLMProgressContainer = document.getElementById('webllm-progress-container');
+    this.webLLMProgressLabel = document.getElementById('webllm-progress-label');
+    this.webLLMProgressPercent = document.getElementById('webllm-progress-percent');
+    this.webLLMProgressFill = document.getElementById('webllm-progress-fill');
+
+    this.spectatorControls = document.getElementById('spectator-controls');
+    this.btnSpectatorPlay = document.getElementById('btn-spectator-play');
+    this.spectatorPlayIcon = document.getElementById('spectator-play-icon');
+    this.spectatorPlayText = document.getElementById('spectator-play-text');
+    this.btnSpectatorStep = document.getElementById('btn-spectator-step');
+    this.selectSpectatorSpeed = document.getElementById('select-spectator-speed');
+
     this._buildBoardGrid();
   }
 
@@ -622,6 +645,121 @@ export class CheckersRenderer {
     }
     if (this.btnReopenModal) {
       this.btnReopenModal.classList.add('hidden');
+    }
+  }
+
+  /**
+   * Updates player badge with custom name, avatar, and persona title.
+   * @param {number} color
+   * @param {Object} info
+   */
+  setPlayerInfo(color, { name, avatar }) {
+    const isRed = color === PLAYER_RED;
+    const nameEl = isRed ? this.playerRedNameEl : this.playerBlackNameEl;
+    const avatarEl = isRed ? this.playerRedAvatarEl : this.playerBlackAvatarEl;
+    if (nameEl && name) nameEl.textContent = name;
+    if (avatarEl && avatar) avatarEl.textContent = avatar;
+  }
+
+  /**
+   * Streams banter into the player's active speech bubble.
+   * @param {number} color
+   * @param {string} text
+   */
+  streamBanter(color, text) {
+    const isRed = color === PLAYER_RED;
+    const bubble = isRed ? this.speechBubbleRed : this.speechBubbleBlack;
+    if (bubble) {
+      const textEl = bubble.querySelector('.bubble-text') || bubble;
+      textEl.textContent = text;
+      bubble.classList.remove('hidden');
+    }
+  }
+
+  /**
+   * Hides speech bubble for a player.
+   * @param {number} color
+   */
+  hideBanter(color) {
+    const isRed = color === PLAYER_RED;
+    const bubble = isRed ? this.speechBubbleRed : this.speechBubbleBlack;
+    if (bubble) {
+      bubble.classList.add('hidden');
+    }
+  }
+
+  /**
+   * Appends a message card to the Arena Live Banter feed.
+   * @param {Object} entry
+   */
+  addBanterToFeed({ color, name, avatar, text, moveDesc }) {
+    if (!this.arenaFeedList) return;
+    const item = document.createElement('div');
+    const isRed = color === PLAYER_RED;
+    item.className = `arena-msg ${isRed ? 'msg-red' : 'msg-black'}`;
+
+    const safeAvatar = avatar || (isRed ? '🔴' : '⚫');
+    const safeName = name || (isRed ? 'Red' : 'Black');
+    const moveTag = moveDesc ? `<span class="msg-move">${moveDesc}</span>` : '';
+
+    item.innerHTML = `
+      <div class="msg-header">
+        <span class="msg-avatar">${safeAvatar}</span>
+        <span class="msg-author">${safeName}</span>
+        ${moveTag}
+      </div>
+      <div class="msg-body">${text}</div>
+    `;
+
+    this.arenaFeedList.appendChild(item);
+    this.arenaFeedList.scrollTop = this.arenaFeedList.scrollHeight;
+  }
+
+  /**
+   * Updates WebLLM model loading progress bar.
+   * @param {Object} report - { text: string, progress: number }
+   */
+  updateDownloadProgress({ text, progress }) {
+    if (!this.webLLMProgressContainer) return;
+
+    if (progress > 0 && progress < 1) {
+      this.webLLMProgressContainer.classList.remove('hidden');
+    } else if (progress >= 1) {
+      setTimeout(() => {
+        if (this.webLLMProgressContainer) {
+          this.webLLMProgressContainer.classList.add('hidden');
+        }
+      }, 1500);
+    }
+
+    const percent = Math.min(100, Math.max(0, Math.round(progress * 100)));
+    if (this.webLLMProgressFill) this.webLLMProgressFill.style.width = `${percent}%`;
+    if (this.webLLMProgressPercent) this.webLLMProgressPercent.textContent = `${percent}%`;
+    if (this.webLLMProgressLabel && text) this.webLLMProgressLabel.textContent = text;
+  }
+
+  /**
+   * Controls spectator bar visibility and play/pause button state.
+   * @param {boolean} isActive
+   * @param {boolean} isPaused
+   */
+  setSpectatorMode(isActive, isPaused) {
+    if (this.spectatorControls) {
+      if (isActive) {
+        this.spectatorControls.classList.remove('hidden');
+      } else {
+        this.spectatorControls.classList.add('hidden');
+      }
+    }
+
+    if (this.spectatorPlayIcon && this.spectatorPlayText) {
+      if (isPaused) {
+        this.spectatorPlayIcon.textContent = '▶';
+        this.spectatorPlayText.textContent = 'Play';
+      } else {
+        this.spectatorPlayIcon.textContent = '❚❚';
+        this.spectatorPlayText.textContent = 'Pause';
+      }
     }
   }
 }

@@ -1,7 +1,7 @@
 /**
  * @file controller.js
  * Game orchestration, turn lifecycle, selection state machine,
- * mandatory capture enforcement, multi-jump management, and AI-ready turn dispatch.
+ * pluggable player architecture, WebLLM banter integration, and Model vs Model spectator arena.
  */
 
 import {
@@ -23,6 +23,13 @@ import {
 } from './rules.js';
 
 import { CheckersAI } from './ai.js';
+import { HumanPlayer } from './players/human_player.js';
+import { MinimaxPlayer } from './players/minimax_player.js';
+import { LLMPlayer } from './players/llm_player.js';
+import { webLLMService } from './llm/web_llm_service.js';
+import { formatMoveDescription } from './llm/prompts.js';
+import { DEFAULT_MODEL_ID } from './llm/model_registry.js';
+import { DEFAULT_PERSONA_RED, DEFAULT_PERSONA_BLACK } from './llm/personas.js';
 
 export class CheckersController {
   /**
@@ -50,32 +57,81 @@ export class CheckersController {
     this.winReason = null;
     this.isAnimating = false;
 
-    // Game Mode: 'ai' (Play vs AI) or 'pvp' (Pass & Play)
+    // Game Mode: 'ai' (Play vs AI), 'pvp' (Pass & Play), or 'arena' (Model vs Model)
     this.gameMode = 'ai';
     this.difficulty = 'medium';
 
-    // Player types: 'human' or 'ai'.
-    // In 'ai' mode, Human is Red (1) and AI is Black (-1).
+    // Model & Tactical settings
+    this.modelId = DEFAULT_MODEL_ID;
+    this.tacticalMode = 'wild'; // 'wild' | 'grandmaster'
+
+    // Spectator Controls (AI vs AI / LLM vs LLM)
+    this.spectatorState = 'playing'; // 'playing' | 'paused'
+    this.spectatorSpeed = 1600;      // Milliseconds delay between spectator moves
+    this.isStepActive = false;
+
+    // Pluggable Player Registry
+    this.players = {
+      [PLAYER_RED]: new HumanPlayer({ id: 'player-red', name: 'Red', color: PLAYER_RED }),
+      [PLAYER_BLACK]: new MinimaxPlayer({
+        id: 'player-black',
+        name: 'Black',
+        color: PLAYER_BLACK,
+        difficulty: this.difficulty
+      })
+    };
+
+    // Backward-compatibility mirror for player types ('human' | 'ai')
     this.playerTypes = {
       [PLAYER_RED]: 'human',
       [PLAYER_BLACK]: 'ai'
     };
 
+    // Backward-compatibility reference to Minimax AI engine
+    this.aiAgent = this.players[PLAYER_BLACK].engine;
+
+    // Turn scheduling and cancellation
+    this.aiTimeoutId = null;
+    this.turnAbortController = null;
+
     // UI Preferences
     this.showNotation = false;
     this.boardFlipped = false;
     this.soundMuted = false;
-
-    // AI Engine instance
-    this.aiAgent = new CheckersAI(this.difficulty);
-
-    // AI turn timeout reference to prevent overlapping runs
-    this.aiTimeoutId = null;
   }
 
+  /**
+   * Returns whether both Red and Black are non-interactive players (Spectator Mode).
+   * @returns {boolean}
+   */
+  get isSpectatorMode() {
+    return !this.players[PLAYER_RED].isInteractive && !this.players[PLAYER_BLACK].isInteractive;
+  }
 
   /**
-   * Initializes event listeners and starts the game.
+   * Sets player instance for a given color.
+   * @param {number} color - PLAYER_RED or PLAYER_BLACK
+   * @param {import('./players/base_player.js').BasePlayer} playerInstance
+   */
+  setPlayer(color, playerInstance) {
+    if (this.players[color]) {
+      this.players[color].dispose();
+    }
+    this.players[color] = playerInstance;
+    this.playerTypes[color] = playerInstance.isInteractive ? 'human' : 'ai';
+
+    if (color === PLAYER_BLACK && playerInstance instanceof MinimaxPlayer) {
+      this.aiAgent = playerInstance.engine;
+    }
+
+    if (this.renderer && typeof this.renderer.setPlayerInfo === 'function') {
+      const avatar = playerInstance.persona ? playerInstance.persona.avatar : (color === PLAYER_RED ? '🔴' : '⚫');
+      this.renderer.setPlayerInfo(color, { name: playerInstance.name, avatar });
+    }
+  }
+
+  /**
+   * Initializes event listeners, model listeners, and starts the game.
    */
   init() {
     // 1. Board click delegation
@@ -141,19 +197,245 @@ export class CheckersController {
         selectDifficulty.value = this.difficulty;
         selectDifficulty.addEventListener('change', (e) => this.setDifficulty(e.target.value));
       }
+
+      // Arena Setup and Spectator Control bindings
+      this._bindArenaControls();
     }
 
-    // 3. Global keyboard shortcut dispatcher
+    // 3. WebLLM Progress Reporting
+    webLLMService.onProgress((report) => {
+      if (this.renderer && typeof this.renderer.updateDownloadProgress === 'function') {
+        this.renderer.updateDownloadProgress(report);
+      }
+    });
+
+    // 4. Global keyboard shortcut dispatcher
     if (typeof window !== 'undefined') {
       window.addEventListener('keydown', (e) => this.handleKeyDown(e));
     }
 
-    // 4. Initial render
+    // 5. Initial render
+    this.updateView();
+
+    // Check if initial turn belongs to automated player
+    if (!this.players[this.state.turn].isInteractive) {
+      this.scheduleAutomatedTurn();
+    }
+  }
+
+  /**
+   * Binds UI controls for Arena setup modal and spectator toolbar.
+   * @private
+   */
+  _bindArenaControls() {
+    if (typeof document === 'undefined') return;
+
+    // Spectator toolbar buttons
+    const btnPlay = document.getElementById('btn-spectator-play');
+    if (btnPlay) {
+      btnPlay.addEventListener('click', () => {
+        if (this.spectatorState === 'playing') {
+          this.spectatorPause();
+        } else {
+          this.spectatorPlay();
+        }
+      });
+    }
+
+    const btnStep = document.getElementById('btn-spectator-step');
+    if (btnStep) {
+      btnStep.addEventListener('click', () => this.spectatorStep());
+    }
+
+    const selectSpeed = document.getElementById('select-spectator-speed');
+    if (selectSpeed) {
+      selectSpeed.value = String(this.spectatorSpeed);
+      selectSpeed.addEventListener('change', (e) => {
+        this.spectatorSpeed = parseInt(e.target.value, 10) || 1600;
+      });
+    }
+
+    // Matchup setup modal triggers
+    const btnOpenArena = document.getElementById('btn-arena-setup');
+    const modalArena = document.getElementById('modal-arena-setup');
+    const btnCloseArena = document.getElementById('btn-close-arena');
+    const btnApplyArena = document.getElementById('btn-apply-arena');
+
+    if (btnOpenArena && modalArena) {
+      btnOpenArena.addEventListener('click', () => {
+        modalArena.classList.remove('hidden');
+      });
+    }
+
+    if (btnCloseArena && modalArena) {
+      btnCloseArena.addEventListener('click', () => {
+        modalArena.classList.add('hidden');
+      });
+    }
+
+    if (btnApplyArena && modalArena) {
+      btnApplyArena.addEventListener('click', () => {
+        this._applyArenaSetupFromDOM();
+        modalArena.classList.add('hidden');
+      });
+    }
+
+    // Clear feed button
+    const btnClearFeed = document.getElementById('btn-clear-feed');
+    if (btnClearFeed && this.renderer && this.renderer.arenaFeedList) {
+      btnClearFeed.addEventListener('click', () => {
+        this.renderer.arenaFeedList.innerHTML = '';
+      });
+    }
+  }
+
+  /**
+   * Reads arena configuration values from modal form and configures matchup.
+   * @private
+   */
+  _applyArenaSetupFromDOM() {
+    if (typeof document === 'undefined') return;
+
+    const redType = document.getElementById('arena-red-type')?.value || 'human';
+    const redPersona = document.getElementById('arena-red-persona')?.value || DEFAULT_PERSONA_RED;
+    const blackType = document.getElementById('arena-black-type')?.value || 'llm';
+    const blackPersona = document.getElementById('arena-black-persona')?.value || DEFAULT_PERSONA_BLACK;
+    const modelId = document.getElementById('arena-model')?.value || DEFAULT_MODEL_ID;
+    const tacticalMode = document.getElementById('arena-tactical-mode')?.value || 'wild';
+
+    this.configureMatchup({
+      redType,
+      redPersona,
+      blackType,
+      blackPersona,
+      modelId,
+      tacticalMode
+    });
+  }
+
+  /**
+   * Configures players for Red and Black and restarts the match.
+   * @param {Object} config
+   */
+  configureMatchup({
+    redType = 'human',
+    redPersona = DEFAULT_PERSONA_RED,
+    blackType = 'ai',
+    blackPersona = DEFAULT_PERSONA_BLACK,
+    modelId = DEFAULT_MODEL_ID,
+    tacticalMode = 'wild'
+  }) {
+    this.modelId = modelId;
+    this.tacticalMode = tacticalMode;
+
+    // Configure Red Player
+    let redPlayer;
+    if (redType === 'human') {
+      redPlayer = new HumanPlayer({ id: 'player-red', name: 'Red (Human)', color: PLAYER_RED });
+    } else if (redType === 'minimax') {
+      redPlayer = new MinimaxPlayer({
+        id: 'player-red',
+        name: `Red (Minimax ${this.difficulty})`,
+        color: PLAYER_RED,
+        difficulty: this.difficulty
+      });
+    } else {
+      redPlayer = new LLMPlayer({
+        id: 'player-red',
+        color: PLAYER_RED,
+        personaId: redPersona,
+        modelId,
+        tacticalMode
+      });
+    }
+
+    // Configure Black Player
+    let blackPlayer;
+    if (blackType === 'human') {
+      blackPlayer = new HumanPlayer({ id: 'player-black', name: 'Black (Human)', color: PLAYER_BLACK });
+    } else if (blackType === 'minimax' || blackType === 'ai') {
+      blackPlayer = new MinimaxPlayer({
+        id: 'player-black',
+        name: `Black (Minimax ${this.difficulty})`,
+        color: PLAYER_BLACK,
+        difficulty: this.difficulty
+      });
+    } else {
+      blackPlayer = new LLMPlayer({
+        id: 'player-black',
+        color: PLAYER_BLACK,
+        personaId: blackPersona,
+        modelId,
+        tacticalMode
+      });
+    }
+
+    this.setPlayer(PLAYER_RED, redPlayer);
+    this.setPlayer(PLAYER_BLACK, blackPlayer);
+
+    // Update gameMode state
+    if (this.isSpectatorMode) {
+      this.gameMode = 'arena';
+      this.spectatorState = 'playing';
+    } else if (blackType === 'human' && redType === 'human') {
+      this.gameMode = 'pvp';
+    } else {
+      this.gameMode = 'ai';
+    }
+
+    // Sync select dropdown in header if present
+    if (typeof document !== 'undefined') {
+      const selectMode = document.getElementById('select-game-mode');
+      if (selectMode) selectMode.value = this.gameMode;
+    }
+
+    this.resetGame();
+  }
+
+  /**
+   * Resumes automated spectator play.
+   */
+  spectatorPlay() {
+    this.spectatorState = 'playing';
+    if (this.renderer && typeof this.renderer.setSpectatorMode === 'function') {
+      this.renderer.setSpectatorMode(true, false);
+    }
+    if (this.state.winner === null && !this.players[this.state.turn].isInteractive) {
+      this.scheduleAutomatedTurn(150);
+    }
+  }
+
+  /**
+   * Pauses automated spectator play.
+   */
+  spectatorPause() {
+    this.spectatorState = 'paused';
+    if (this.turnAbortController) {
+      this.turnAbortController.abort();
+      this.turnAbortController = null;
+    }
+    if (this.aiTimeoutId !== null) {
+      clearTimeout(this.aiTimeoutId);
+      this.aiTimeoutId = null;
+    }
+    if (this.renderer && typeof this.renderer.setSpectatorMode === 'function') {
+      this.renderer.setSpectatorMode(true, true);
+    }
+    this.statusMessage = 'Spectator match paused.';
     this.updateView();
   }
 
   /**
-   * Dispatches keyboard shortcuts (Esc, R, M, N, F) safely.
+   * Advances exactly one automated move in spectator mode.
+   */
+  spectatorStep() {
+    if (this.isAnimating || this.state.winner !== null) return;
+    this.isStepActive = true;
+    this.scheduleAutomatedTurn(50);
+  }
+
+  /**
+   * Dispatches keyboard shortcuts (Esc, R, M, N, F, Space).
    * @param {KeyboardEvent} event
    */
   handleKeyDown(event) {
@@ -173,6 +455,13 @@ export class CheckersController {
       this.toggleNotation();
     } else if (key === 'f') {
       this.toggleRotate();
+    } else if (event.code === 'Space' && this.isSpectatorMode) {
+      event.preventDefault();
+      if (this.spectatorState === 'playing') {
+        this.spectatorPause();
+      } else {
+        this.spectatorPlay();
+      }
     }
   }
 
@@ -192,10 +481,11 @@ export class CheckersController {
    * @param {number} index
    */
   handleSquareClick(index) {
-    // Ignore input if animating, game is over, or current turn belongs to AI
     if (this.isAnimating) return;
     if (this.state.winner !== null) return;
-    if (this.playerTypes[this.state.turn] !== 'human') return;
+
+    const activePlayer = this.players[this.state.turn];
+    if (!activePlayer || !activePlayer.isInteractive) return;
 
     const legalMoves = getLegalMoves(
       this.state.board,
@@ -210,6 +500,9 @@ export class CheckersController {
       );
 
       if (validMove) {
+        if (activePlayer instanceof HumanPlayer) {
+          activePlayer.submitMove(validMove);
+        }
         this.executeMove(validMove);
       } else {
         this.statusMessage = 'Multi-jump in progress! You must complete the capture chain.';
@@ -269,6 +562,9 @@ export class CheckersController {
     // Check if clicked square is a valid destination for the selected piece
     const move = legalMoves.find((m) => m.from === selected && m.to === index);
     if (move) {
+      if (activePlayer instanceof HumanPlayer) {
+        activePlayer.submitMove(move);
+      }
       this.executeMove(move);
     } else {
       // Clicked an invalid destination square: deselect
@@ -337,6 +633,9 @@ export class CheckersController {
    * @private
    */
   _finalizeMove(move, nextBoard, crowned, canContinueJump) {
+    const executedTurn = this.state.turn;
+    const executingPlayer = this.players[executedTurn];
+
     this.state.board = nextBoard;
     this.lastMove = { from: move.from, to: move.to };
 
@@ -374,52 +673,179 @@ export class CheckersController {
 
     this.updateView(crowned ? move.to : null);
 
-    // If turn switched or continues to AI, schedule AI turn
-    if (this.state.winner === null && this.playerTypes[this.state.turn] === 'ai') {
-      // 250ms pacing between successive chained hops, 300ms for opening turn moves
-      const delay = canContinueJump ? 250 : 300;
-      this.scheduleAiTurn(delay);
+    // Notify players of executed move
+    const moveRecord = {
+      player: executedTurn,
+      from: move.from,
+      to: move.to,
+      isJump: move.isJump,
+      crowned,
+      board: nextBoard
+    };
+    if (this.players[PLAYER_RED]) this.players[PLAYER_RED].onMoveExecuted(moveRecord);
+    if (this.players[PLAYER_BLACK]) this.players[PLAYER_BLACK].onMoveExecuted(moveRecord);
+
+    // If game ended, stop
+    if (this.state.winner !== null) {
+      return;
+    }
+
+    // Handle next turn for automated players
+    const nextPlayer = this.players[this.state.turn];
+    if (!nextPlayer.isInteractive) {
+      if (this.isSpectatorMode && this.isStepActive) {
+        // Single step completed: pause spectator
+        this.isStepActive = false;
+        this.spectatorPause();
+        return;
+      }
+
+      if (this.isSpectatorMode && this.spectatorState === 'paused') {
+        return;
+      }
+
+      const delay = canContinueJump
+        ? 250
+        : (this.isSpectatorMode ? Math.max(300, this.spectatorSpeed) : 300);
+
+      this.scheduleAutomatedTurn(delay);
     }
   }
 
   /**
-   * Schedules AI move execution with natural delay and status indicator.
-   * @param {number} [delay=300] - milliseconds to wait before AI computes and executes
+   * Schedules move execution for automated players (Minimax or LLM).
+   * @param {number} [delay=300]
    */
-  scheduleAiTurn(delay = 300) {
-    if (!this.aiAgent) return;
+  scheduleAutomatedTurn(delay = 300) {
     if (this.aiTimeoutId !== null) {
       clearTimeout(this.aiTimeoutId);
       this.aiTimeoutId = null;
     }
 
-    this.statusMessage = 'AI is thinking...';
+    if (this.turnAbortController) {
+      this.turnAbortController.abort();
+      this.turnAbortController = null;
+    }
+
+    const activePlayer = this.players[this.state.turn];
+    if (!activePlayer || activePlayer.isInteractive) return;
+
+    if (this.isSpectatorMode && this.spectatorState === 'paused' && !this.isStepActive) {
+      return;
+    }
+
+    if (activePlayer.type === 'minimax') {
+      this.statusMessage = 'AI is thinking...';
+    } else {
+      this.statusMessage = `${activePlayer.name} is thinking...`;
+    }
     this.updateView();
 
-    this.aiTimeoutId = setTimeout(() => {
-      this.aiTimeoutId = null;
-      if (this.state.winner !== null) return;
-      if (this.playerTypes[this.state.turn] !== 'ai') return;
+    this.turnAbortController = new AbortController();
+    const currentSignal = this.turnAbortController.signal;
 
-      const move = this.aiAgent.getBestMove(this.state);
-      if (move) {
-        this.executeMove(move);
+    this.aiTimeoutId = setTimeout(async () => {
+      this.aiTimeoutId = null;
+      if (this.state.winner !== null || currentSignal.aborted) return;
+
+      const legalMoves = getLegalMoves(
+        this.state.board,
+        this.state.turn,
+        this.state.mustContinueJumpFrom
+      );
+
+      if (legalMoves.length === 0) return;
+
+      try {
+        const turnContext = {
+          board: this.state.board,
+          turn: this.state.turn,
+          mustContinueJumpFrom: this.state.mustContinueJumpFrom,
+          legalMoves,
+          stats: this.stats,
+          halfMovesWithoutProgress: this.halfMovesWithoutProgress,
+          signal: currentSignal
+        };
+
+        const result = await activePlayer.requestMove(turnContext);
+        if (currentSignal.aborted || !result || !result.move) return;
+
+        const chosenMove = result.move;
+
+        // If active player is an LLMPlayer, trigger concurrent personality banter streaming
+        if (activePlayer instanceof LLMPlayer && typeof activePlayer.streamBanter === 'function') {
+          const moveDesc = formatMoveDescription(chosenMove);
+          activePlayer.streamBanter({
+            move: chosenMove,
+            board: this.state.board,
+            turn: this.state.turn,
+            crowned: false,
+            onToken: (delta, full) => {
+              if (this.renderer && typeof this.renderer.streamBanter === 'function') {
+                this.renderer.streamBanter(this.state.turn, full);
+              }
+            },
+            signal: currentSignal
+          }).then((banter) => {
+            if (banter && this.renderer && typeof this.renderer.addBanterToFeed === 'function') {
+              this.renderer.addBanterToFeed({
+                color: activePlayer.color,
+                name: activePlayer.name,
+                avatar: activePlayer.persona?.avatar,
+                text: banter,
+                moveDesc
+              });
+            }
+          }).catch(() => {});
+        }
+
+        this.executeMove(chosenMove);
+      } catch (err) {
+        if (!currentSignal.aborted) {
+          console.error(`[Controller] Error during ${activePlayer.name}'s move:`, err);
+          // Safety fallback: execute first legal move to keep game running
+          if (legalMoves.length > 0) {
+            this.executeMove(legalMoves[0]);
+          }
+        }
       }
     }, delay);
   }
 
   /**
-   * Sets game mode: 'ai' (Play vs AI) or 'pvp' (Pass & Play).
+   * Sets game mode: 'ai' (Play vs AI), 'pvp' (Pass & Play), or 'arena' (Model vs Model).
    * @param {string} mode
    */
   setGameMode(mode) {
     this.gameMode = mode;
+
     if (mode === 'ai') {
-      this.playerTypes[PLAYER_RED] = 'human';
-      this.playerTypes[PLAYER_BLACK] = 'ai';
-    } else {
-      this.playerTypes[PLAYER_RED] = 'human';
-      this.playerTypes[PLAYER_BLACK] = 'human';
+      this.setPlayer(PLAYER_RED, new HumanPlayer({ id: 'player-red', name: 'Red', color: PLAYER_RED }));
+      this.setPlayer(PLAYER_BLACK, new MinimaxPlayer({
+        id: 'player-black',
+        name: 'Black',
+        color: PLAYER_BLACK,
+        difficulty: this.difficulty
+      }));
+    } else if (mode === 'pvp') {
+      this.setPlayer(PLAYER_RED, new HumanPlayer({ id: 'player-red', name: 'Red', color: PLAYER_RED }));
+      this.setPlayer(PLAYER_BLACK, new HumanPlayer({ id: 'player-black', name: 'Black', color: PLAYER_BLACK }));
+    } else if (mode === 'arena') {
+      this.setPlayer(PLAYER_RED, new LLMPlayer({
+        id: 'player-red',
+        color: PLAYER_RED,
+        personaId: DEFAULT_PERSONA_RED,
+        modelId: this.modelId,
+        tacticalMode: this.tacticalMode
+      }));
+      this.setPlayer(PLAYER_BLACK, new LLMPlayer({
+        id: 'player-black',
+        color: PLAYER_BLACK,
+        personaId: DEFAULT_PERSONA_BLACK,
+        modelId: this.modelId,
+        tacticalMode: this.tacticalMode
+      }));
+      this.spectatorState = 'playing';
     }
 
     // Toggle difficulty selector visibility if in DOM
@@ -430,12 +856,7 @@ export class CheckersController {
       }
     }
 
-    // If active turn is now AI, schedule AI move
-    if (this.state.winner === null && this.playerTypes[this.state.turn] === 'ai') {
-      this.scheduleAiTurn();
-    } else {
-      this.updateView();
-    }
+    this.resetGame();
   }
 
   /**
@@ -444,8 +865,12 @@ export class CheckersController {
    */
   setDifficulty(diff) {
     this.difficulty = diff;
-    if (this.aiAgent) {
-      this.aiAgent.setDifficulty(diff);
+    if (this.players[PLAYER_BLACK] instanceof MinimaxPlayer) {
+      this.players[PLAYER_BLACK].setDifficulty(diff);
+      this.aiAgent = this.players[PLAYER_BLACK].engine;
+    }
+    if (this.players[PLAYER_RED] instanceof MinimaxPlayer) {
+      this.players[PLAYER_RED].setDifficulty(diff);
     }
   }
 
@@ -454,8 +879,10 @@ export class CheckersController {
    * @param {number|null} [newlyCrownedIndex=null]
    */
   updateView(newlyCrownedIndex = null) {
-    const isAiTurn = this.playerTypes[this.state.turn] === 'ai';
-    const legalMoves = (this.state.winner !== null || isAiTurn)
+    const activePlayer = this.players[this.state.turn];
+    const isInteractive = activePlayer && activePlayer.isInteractive;
+
+    const legalMoves = (this.state.winner !== null || !isInteractive)
       ? []
       : getLegalMoves(this.state.board, this.state.turn, this.state.mustContinueJumpFrom);
 
@@ -485,6 +912,10 @@ export class CheckersController {
       }
     }
 
+    if (this.renderer && typeof this.renderer.setSpectatorMode === 'function') {
+      this.renderer.setSpectatorMode(this.isSpectatorMode, this.spectatorState === 'paused');
+    }
+
     this.renderer.render({
       state: this.state,
       legalMovesForSelected,
@@ -503,10 +934,18 @@ export class CheckersController {
    * Resets game to starting position.
    */
   resetGame() {
+    if (this.turnAbortController) {
+      this.turnAbortController.abort();
+      this.turnAbortController = null;
+    }
     if (this.aiTimeoutId !== null) {
       clearTimeout(this.aiTimeoutId);
       this.aiTimeoutId = null;
     }
+
+    if (this.players[PLAYER_RED]) this.players[PLAYER_RED].dispose();
+    if (this.players[PLAYER_BLACK]) this.players[PLAYER_BLACK].dispose();
+
     this.state = createInitialState();
     this.lastMove = null;
     this.statusMessage = '';
@@ -521,10 +960,25 @@ export class CheckersController {
       blackKingsCrowned: 0,
       startTime: Date.now()
     };
+
+    if (this.renderer) {
+      if (typeof this.renderer.hideBanter === 'function') {
+        this.renderer.hideBanter(PLAYER_RED);
+        this.renderer.hideBanter(PLAYER_BLACK);
+      }
+      if (typeof this.renderer.setPlayerInfo === 'function') {
+        const redAvatar = this.players[PLAYER_RED]?.persona?.avatar || '🔴';
+        const blackAvatar = this.players[PLAYER_BLACK]?.persona?.avatar || '⚫';
+        this.renderer.setPlayerInfo(PLAYER_RED, { name: this.players[PLAYER_RED]?.name || 'Red', avatar: redAvatar });
+        this.renderer.setPlayerInfo(PLAYER_BLACK, { name: this.players[PLAYER_BLACK]?.name || 'Black', avatar: blackAvatar });
+      }
+    }
+
     this.updateView();
 
-    if (this.playerTypes[this.state.turn] === 'ai') {
-      this.scheduleAiTurn();
+    const activePlayer = this.players[this.state.turn];
+    if (activePlayer && !activePlayer.isInteractive) {
+      this.scheduleAutomatedTurn();
     }
   }
 
@@ -552,4 +1006,3 @@ export class CheckersController {
     this.renderer.setMuted(this.soundMuted);
   }
 }
-

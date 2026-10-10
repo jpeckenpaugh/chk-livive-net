@@ -3,19 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Client-side English Draughts (Checkers) game in pure vanilla JavaScript and CSS Grid.">
-  <title>Classic Checkers</title>
+  <meta name="description" content="Client-side English Draughts (Checkers) with client-side WebLLM in-browser AI and spectator arena.">
+  <title>Classic Checkers & AI Arena</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="app-container">
     <header class="game-header">
-      <h1 class="game-title">Classic Checkers</h1>
+      <div class="brand-group">
+        <h1 class="game-title">Classic Checkers</h1>
+        <span class="arena-tag">⚔️ WebGPU AI Arena</span>
+      </div>
       <div class="header-controls">
         <div class="control-group">
           <select id="select-game-mode" class="select-control" aria-label="Game Mode" title="Game Mode">
             <option value="ai" selected>Play vs AI</option>
             <option value="pvp">Pass & Play</option>
+            <option value="arena">AI vs AI Arena</option>
           </select>
           <select id="select-difficulty" class="select-control" aria-label="AI Difficulty" title="AI Difficulty">
             <option value="easy">Easy</option>
@@ -23,6 +27,10 @@
             <option value="hard">Hard</option>
           </select>
         </div>
+        <button id="btn-arena-setup" class="btn btn-secondary" title="Configure Players & Personas" aria-label="Arena Setup">
+          <span class="btn-icon-symbol">⚔️</span>
+          <span class="btn-text">Matchup Setup</span>
+        </button>
         <button id="btn-rotate" class="btn btn-icon" title="Rotate Board" aria-label="Rotate Board">
           <svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
@@ -54,16 +62,54 @@
       </div>
     </header>
 
-    <!-- Scoreboard and Status Area -->
+    <!-- WebLLM Download & Initialization Progress Bar -->
+    <div id="webllm-progress-container" class="webllm-progress-container hidden" role="status" aria-live="polite">
+      <div class="progress-bar-header">
+        <span id="webllm-progress-label" class="progress-label">Downloading Model...</span>
+        <span id="webllm-progress-percent" class="progress-percent">0%</span>
+      </div>
+      <div class="progress-track">
+        <div id="webllm-progress-fill" class="progress-fill" style="width: 0%;"></div>
+      </div>
+    </div>
+
+    <!-- Spectator Toolbar (Active during Model vs Model) -->
+    <div id="spectator-controls" class="spectator-controls hidden" role="region" aria-label="Spectator Controls">
+      <div class="spectator-badge">👁️ Spectator Mode</div>
+      <div class="spectator-actions">
+        <button id="btn-spectator-play" class="btn btn-icon btn-sm" title="Play / Pause">
+          <span id="spectator-play-icon">❚❚</span>
+          <span id="spectator-play-text" class="btn-text">Pause</span>
+        </button>
+        <button id="btn-spectator-step" class="btn btn-icon btn-sm" title="Step 1 Move">
+          <span>⏭</span>
+          <span class="btn-text">Step</span>
+        </button>
+        <div class="spectator-speed-group">
+          <label for="select-spectator-speed" class="speed-label">Pacing:</label>
+          <select id="select-spectator-speed" class="select-control select-sm">
+            <option value="800">Fast (0.8s)</option>
+            <option value="1600" selected>Normal (1.6s)</option>
+            <option value="3200">Theatrical (3.2s)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scoreboard, Personas, and Banter Speech Bubbles -->
     <section class="game-info-card">
       <div class="player-card player-black" id="player-black-card">
         <div class="player-badge">
-          <span class="piece-avatar black-avatar"></span>
-          <span class="player-name">Black</span>
+          <span class="piece-avatar black-avatar" id="player-black-avatar">⚫</span>
+          <span class="player-name" id="player-black-name">Black</span>
         </div>
         <div class="player-stats">
           <span class="stat-item"><strong id="black-pieces-count">12</strong> pieces</span>
           <span class="stat-item kings-count"><strong id="black-kings-count">0</strong> <span class="crown-symbol">♔</span></span>
+        </div>
+        <!-- Black Speech Bubble for In-Game Banter -->
+        <div class="speech-bubble hidden" id="speech-bubble-black" aria-live="polite">
+          <span class="bubble-text">...</span>
         </div>
       </div>
 
@@ -77,12 +123,16 @@
 
       <div class="player-card player-red active-turn" id="player-red-card">
         <div class="player-badge">
-          <span class="piece-avatar red-avatar"></span>
-          <span class="player-name">Red</span>
+          <span class="piece-avatar red-avatar" id="player-red-avatar">🔴</span>
+          <span class="player-name" id="player-red-name">Red</span>
         </div>
         <div class="player-stats">
           <span class="stat-item"><strong id="red-pieces-count">12</strong> pieces</span>
           <span class="stat-item kings-count"><strong id="red-kings-count">0</strong> <span class="crown-symbol">♔</span></span>
+        </div>
+        <!-- Red Speech Bubble for In-Game Banter -->
+        <div class="speech-bubble hidden" id="speech-bubble-red" aria-live="polite">
+          <span class="bubble-text">...</span>
         </div>
       </div>
     </section>
@@ -93,10 +143,29 @@
       <span id="multijump-text" class="multijump-text">Capture chain in progress! Complete the jump.</span>
     </div>
 
-    <!-- Checkers Board Area -->
-    <main class="board-wrapper">
-      <div id="board" class="board" role="grid" aria-label="Checkers Board"></div>
-    </main>
+    <!-- Arena Dual-Column Main Area: Board & Live Banter Feed -->
+    <div class="main-layout-container">
+      <!-- Checkers Board Area -->
+      <main class="board-wrapper">
+        <div id="board" class="board" role="grid" aria-label="Checkers Board"></div>
+      </main>
+
+      <!-- Arena Live Banter Chat Log -->
+      <aside class="arena-feed-section" id="arena-feed-section">
+        <div class="arena-feed-header">
+          <div class="feed-title-wrap">
+            <span class="feed-icon">💬</span>
+            <span class="arena-feed-title">Arena Live Banter</span>
+          </div>
+          <button id="btn-clear-feed" class="btn btn-subtle btn-xs" title="Clear Chat Log">Clear</button>
+        </div>
+        <div id="arena-feed-list" class="arena-feed-list" role="log" aria-live="polite">
+          <div class="arena-msg arena-welcome-msg">
+            <div class="msg-body">⚔️ Welcome to the Checkers Arena! In-character taunts and move reactions will stream here in real time.</div>
+          </div>
+        </div>
+      </aside>
+    </div>
 
     <!-- Floating Re-open Recap Pill (when reviewing board) -->
     <button id="btn-reopen-modal" class="reopen-modal-pill hidden" title="View Match Recap">
@@ -105,12 +174,98 @@
 
     <!-- Keyboard Shortcuts Legend Footer -->
     <footer class="keyboard-legend" aria-label="Keyboard Shortcuts">
+      <span class="legend-item"><kbd>Space</kbd> Play/Pause</span>
       <span class="legend-item"><kbd>Esc</kbd> Deselect</span>
       <span class="legend-item"><kbd>R</kbd> New Game</span>
       <span class="legend-item"><kbd>M</kbd> Mute</span>
       <span class="legend-item"><kbd>N</kbd> Numbers</span>
       <span class="legend-item"><kbd>F</kbd> Flip</span>
     </footer>
+
+    <!-- Arena Setup Modal Overlay -->
+    <div id="modal-arena-setup" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="arena-setup-title">
+      <div class="modal-card modal-card-wide">
+        <div class="modal-header-row">
+          <h2 id="arena-setup-title" class="modal-title">⚔️ Matchup & AI Arena Setup</h2>
+          <button id="btn-close-arena" class="modal-close-btn" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="setup-grid">
+          <!-- Red Player Setup -->
+          <div class="setup-panel panel-red">
+            <h3 class="panel-heading"><span class="color-dot dot-red"></span> Red Player</h3>
+            <div class="form-group">
+              <label for="arena-red-type">Player Controller:</label>
+              <select id="arena-red-type" class="select-control full-width">
+                <option value="human" selected>Human (Interactive)</option>
+                <option value="minimax">Minimax Search Engine</option>
+                <option value="llm">WebLLM Neural Agent</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="arena-red-persona">Personality Profile:</label>
+              <select id="arena-red-persona" class="select-control full-width">
+                <option value="pirate" selected>🏴‍☠️ Captain Redbeard (Pirate)</option>
+                <option value="victorian">🧐 Lord Worthington (Victorian)</option>
+                <option value="cyber">🤖 Unit 734 (Synthetic Core)</option>
+                <option value="anime">⚡ Kenji (Anime Rival)</option>
+                <option value="coach">🧢 Coach Dan (Sports Coach)</option>
+                <option value="grandma">👵 Granny Edna (Sweet Baker)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Black Player Setup -->
+          <div class="setup-panel panel-black">
+            <h3 class="panel-heading"><span class="color-dot dot-black"></span> Black Player</h3>
+            <div class="form-group">
+              <label for="arena-black-type">Player Controller:</label>
+              <select id="arena-black-type" class="select-control full-width">
+                <option value="human">Human (Interactive)</option>
+                <option value="minimax" selected>Minimax Search Engine</option>
+                <option value="llm">WebLLM Neural Agent</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="arena-black-persona">Personality Profile:</label>
+              <select id="arena-black-persona" class="select-control full-width">
+                <option value="pirate">🏴‍☠️ Captain Redbeard (Pirate)</option>
+                <option value="victorian" selected>🧐 Lord Worthington (Victorian)</option>
+                <option value="cyber">🤖 Unit 734 (Synthetic Core)</option>
+                <option value="anime">⚡ Kenji (Anime Rival)</option>
+                <option value="coach">🧢 Coach Dan (Sports Coach)</option>
+                <option value="grandma">👵 Granny Edna (Sweet Baker)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Global Engine & Model Settings -->
+        <div class="setup-global-settings">
+          <div class="form-group">
+            <label for="arena-model">In-Browser LLM (WebGPU):</label>
+            <select id="arena-model" class="select-control full-width">
+              <option value="SmolLM2-1.7B-Instruct-q4f16_1-MLC" selected>SmolLM2 1.7B (Recommended, ~950MB cached)</option>
+              <option value="SmolLM2-360M-Instruct-q4f16_1-MLC">SmolLM2 360M (Ultra Fast, ~190MB download)</option>
+              <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama 3.2 1B (Balanced, ~880MB download)</option>
+              <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">Llama 3.2 3B (Grandmaster, ~1.9GB download)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="arena-tactical-mode">Tactical Move Engine:</label>
+            <select id="arena-tactical-mode" class="select-control full-width">
+              <option value="wild" selected>Wild LLM (Autonomous move selection)</option>
+              <option value="grandmaster">Grandmaster LLM (Minimax-augmented advice)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="btn-apply-arena" class="btn btn-primary btn-large">Start Match</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Game Over Modal Overlay -->
     <div id="game-over-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -155,4 +310,3 @@
   <script type="module" src="src/main.js"></script>
 </body>
 </html>
-
