@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" path="res://scenes/mode_select.tscn" id="5_mode"]
 [ext_resource type="PackedScene" path="res://scenes/preload_staging.tscn" id="6_preload"]
 [ext_resource type="PackedScene" path="res://scenes/game_over_modal.tscn" id="7_gameover"]
+[ext_resource type="PackedScene" path="res://scenes/theme_modal.tscn" id="8_theme_modal"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
 sky_top_color = Color(0.18, 0.2, 0.24, 1)
@@ -74,4 +75,7 @@ visible = false
 visible = false
 
 [node name="GameOverModal" parent="UI" instance=ExtResource("7_gameover")]
+visible = false
+
+[node name="ThemeModal" parent="UI" instance=ExtResource("8_theme_modal")]
 visible = false

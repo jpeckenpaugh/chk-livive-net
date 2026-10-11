@@ -2,20 +2,27 @@ extends Node3D
 
 ## BoardView
 ## 3D Checkers Board representation:
-## - 8x8 squares (32 light cream lacquer, 32 dark walnut lacquer)
-## - Outer mahogany bezel
+## - 8x8 squares (32 light squares, 32 dark squares) with dynamic theme materials
+## - Outer perimeter bezel and base plate
 ## - Area3D raycast click handlers on dark squares
 ## - 1..32 Draughts notation labels with toggle
 ## - Square highlight indicators (Selected, Legal Moves, Prey Targets, Last Move, Selectable)
 ## - Piece management, syncing, and move animations
+## - Live ThemeManager integration (Wood, Marble, Glass, Metal, Cyber)
 
 const PieceScene = preload("res://scenes/piece.tscn")
 
 @onready var squares_container: Node3D = $Squares
 @onready var pieces_container: Node3D = $Pieces
+@onready var base_plate: MeshInstance3D = $BasePlate
+@onready var rail_north: MeshInstance3D = $RailNorth
+@onready var rail_south: MeshInstance3D = $RailSouth
+@onready var rail_west: MeshInstance3D = $RailWest
+@onready var rail_east: MeshInstance3D = $RailEast
 
 var _pieces: Dictionary = {} # square_index (int) -> PieceView
-var _dark_squares: Array[Dictionary] = [] # 32 items: { "area": Area3D, "highlight": MeshInstance3D, "label": Label3D }
+var _dark_squares: Array[Dictionary] = [] # 32 items: { "area": Area3D, "mesh": MeshInstance3D, "highlight": MeshInstance3D, "label": Label3D }
+var _light_squares: Array[MeshInstance3D] = [] # 32 light square meshes
 var _show_notation: bool = false
 
 # Materials
@@ -30,15 +37,25 @@ var mat_hl_selectable: StandardMaterial3D
 func _ready() -> void:
 	_init_materials()
 	_build_board()
+	if ThemeManager != null:
+		ThemeManager.theme_changed.connect(_on_theme_changed)
+		_apply_theme_materials()
+
+func _exit_tree() -> void:
+	if ThemeManager != null and ThemeManager.theme_changed.is_connected(_on_theme_changed):
+		ThemeManager.theme_changed.disconnect(_on_theme_changed)
+
+func _on_theme_changed(_theme_id: String) -> void:
+	_apply_theme_materials()
 
 func _init_materials() -> void:
-	# Light squares: cream/birch lacquer
+	# Default Light squares: cream lacquer
 	mat_light_sq = StandardMaterial3D.new()
 	mat_light_sq.albedo_color = Color(0.88, 0.82, 0.72)
 	mat_light_sq.roughness = 0.25
 	mat_light_sq.metallic = 0.05
 
-	# Dark squares: walnut lacquer
+	# Default Dark squares: walnut lacquer
 	mat_dark_sq = StandardMaterial3D.new()
 	mat_dark_sq.albedo_color = Color(0.18, 0.12, 0.08)
 	mat_dark_sq.roughness = 0.25
@@ -74,8 +91,36 @@ func _init_materials() -> void:
 	mat_hl_selectable.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat_hl_selectable.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 
+func _apply_theme_materials() -> void:
+	if ThemeManager == null:
+		return
+	var mats: Dictionary = ThemeManager.get_board_materials()
+	var l_mat = mats.get("light", null)
+	var d_mat = mats.get("dark", null)
+	var f_mat = mats.get("frame", null)
+
+	if l_mat != null:
+		mat_light_sq = l_mat
+		for l_mesh in _light_squares:
+			if l_mesh != null:
+				l_mesh.set_surface_override_material(0, l_mat)
+
+	if d_mat != null:
+		mat_dark_sq = d_mat
+		for sq in _dark_squares:
+			if sq.has("mesh") and sq["mesh"] != null:
+				sq["mesh"].set_surface_override_material(0, d_mat)
+
+	if f_mat != null:
+		if base_plate != null: base_plate.set_surface_override_material(0, f_mat)
+		if rail_north != null: rail_north.set_surface_override_material(0, f_mat)
+		if rail_south != null: rail_south.set_surface_override_material(0, f_mat)
+		if rail_west != null: rail_west.set_surface_override_material(0, f_mat)
+		if rail_east != null: rail_east.set_surface_override_material(0, f_mat)
+
 func _build_board() -> void:
 	_dark_squares.resize(32)
+	_light_squares.clear()
 
 	# Shared meshes
 	var box_mesh: BoxMesh = BoxMesh.new()
@@ -140,6 +185,7 @@ func _build_board() -> void:
 				squares_container.add_child(area)
 				_dark_squares[sq_index] = {
 					"area": area,
+					"mesh": mesh_inst,
 					"highlight": hl_inst,
 					"label": label
 				}
@@ -151,6 +197,7 @@ func _build_board() -> void:
 				light_mesh.position = Vector3(pos_x, -0.05, pos_z)
 				light_mesh.set_surface_override_material(0, mat_light_sq)
 				squares_container.add_child(light_mesh)
+				_light_squares.append(light_mesh)
 
 func index_to_coord(index: int) -> Vector2i:
 	var row: int = index / 4

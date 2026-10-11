@@ -40,7 +40,7 @@ func _on_download_progress(data: Dictionary) -> void:
 	var is_error: bool = bool(data.get("error", false))
 	if is_error:
 		if percent_label:
-			percent_label.text = "⚠️"
+			percent_label.text = "ERR"
 		if status_label:
 			status_label.text = text
 		var tween: Tween = create_tween()

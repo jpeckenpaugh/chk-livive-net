@@ -56,11 +56,11 @@ alignment = 1
 [node name="BtnPlayPause" type="Button" parent="Panel/Margin/HBox"]
 custom_minimum_size = Vector2(80, 0)
 layout_mode = 2
-text = "⏸ Pause"
+text = "Pause"
 
 [node name="BtnStep" type="Button" parent="Panel/Margin/HBox"]
 layout_mode = 2
-text = "⏭ Step"
+text = "Step"
 
 [node name="VSeparator" type="VSeparator" parent="Panel/Margin/HBox"]
 layout_mode = 2

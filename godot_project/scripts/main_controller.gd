@@ -7,17 +7,23 @@ extends Node3D
 @onready var camera_pivot: Node3D = $CameraPivot
 @onready var camera: Camera3D = $CameraPivot/Camera3D
 @onready var board: Node3D = $Board
+@onready var pedestal: MeshInstance3D = $BoardPedestal
 
 @onready var hud: Control = $UI/HUD
 @onready var spectator_bar: Control = $UI/SpectatorBar
 @onready var mode_select: Control = $UI/ModeSelect
 @onready var preload_staging: Control = $UI/PreloadStaging
 @onready var game_over_modal: Control = $UI/GameOverModal
+@onready var theme_modal: Control = $UI/ThemeModal
 
 func _ready() -> void:
 	# Orient camera to look at the board center with slight forward bias to clear top HUD
 	if camera != null:
 		camera.look_at(Vector3(0, 0, -0.15), Vector3.UP)
+
+	if ThemeManager != null:
+		ThemeManager.theme_changed.connect(_on_theme_changed)
+		_apply_pedestal_material()
 
 	# Connect Autoload Bridge signals
 	if Bridge != null:
@@ -29,6 +35,7 @@ func _ready() -> void:
 	# Wire UI navigation signals
 	if hud != null:
 		hud.open_mode_select_requested.connect(_on_open_mode_select)
+		hud.open_theme_modal_requested.connect(_on_open_theme_modal)
 		hud.reopen_game_over_requested.connect(_on_reopen_game_over)
 
 	if game_over_modal != null:
@@ -43,6 +50,12 @@ func _ready() -> void:
 func _on_open_mode_select() -> void:
 	if mode_select != null:
 		mode_select.visible = true
+
+func _on_open_theme_modal() -> void:
+	if theme_modal != null and theme_modal.has_method("open"):
+		theme_modal.open()
+	elif theme_modal != null:
+		theme_modal.visible = true
 
 func _on_match_launched(_config: Dictionary) -> void:
 	if hud != null:
@@ -77,3 +90,14 @@ func _on_board_flipped(flipped: bool) -> void:
 func _on_show_notation_changed(show: bool) -> void:
 	if board != null and board.has_method("set_show_notation"):
 		board.set_show_notation(show)
+
+func _on_theme_changed(_theme_id: String) -> void:
+	_apply_pedestal_material()
+
+func _apply_pedestal_material() -> void:
+	if pedestal == null or ThemeManager == null:
+		return
+	var mats = ThemeManager.get_board_materials()
+	var frame_mat = mats.get("frame", null)
+	if frame_mat != null:
+		pedestal.set_surface_override_material(0, frame_mat)

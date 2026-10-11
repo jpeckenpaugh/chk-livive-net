@@ -2,7 +2,8 @@ extends Control
 
 ## mode_select_view.gd
 ## Controller for the Game Mode Selection modal dialog.
-## Supports Pass & Play, vs Minimax AI, vs WebLLM AI, and Spectator Arena.
+## Supports Pass & Play, vs Minimax AI, vs WebLLM AI, Spectator Arena,
+## and live Theme selection across Wood, Marble, Glass, Metal, and Cyber.
 
 signal match_launched(config: Dictionary)
 
@@ -35,6 +36,9 @@ signal match_launched(config: Dictionary)
 @onready var arena_red_type: OptionButton = $Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena/RedHBox/RedTypeOption
 @onready var arena_black_type: OptionButton = $Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena/BlackHBox/BlackTypeOption
 
+# Theme Selector
+@onready var theme_option: OptionButton = $Backdrop/Dialog/Margin/VBox/ThemeHBox/ThemeOption
+
 # Action Buttons
 @onready var btn_start: Button = $Backdrop/Dialog/Margin/VBox/Actions/BtnStart
 @onready var btn_close: Button = $Backdrop/Dialog/Margin/VBox/Header/BtnClose
@@ -47,13 +51,13 @@ var _llm_color: String = "red"
 var _llm_persona: String = "victorian"
 var _llm_model: String = "Llama-3.2-1B-Instruct-q4f16_1-MLC"
 
-# Persona list
+# Clean persona list without emoji glyph issues
 const PERSONAS = [
-	{ "id": "victorian", "label": "🧐 Lord Worthington (Victorian)" },
-	{ "id": "pirate", "label": "🏴‍☠️ Captain Redbeard (Pirate)" },
-	{ "id": "cyber", "label": "🤖 Unit 734 (Robot Core)" },
-	{ "id": "anime", "label": "⚡ Kenji Kurogane (Anime Rival)" },
-	{ "id": "grandma", "label": "👵 Granny Edna (Warm Baker)" }
+	{ "id": "victorian", "label": "Lord Worthington (Victorian)" },
+	{ "id": "pirate", "label": "Captain Redbeard (Pirate)" },
+	{ "id": "cyber", "label": "Unit 734 (Robot Core)" },
+	{ "id": "anime", "label": "Kenji Kurogane (Anime Rival)" },
+	{ "id": "grandma", "label": "Granny Edna (Warm Baker)" }
 ]
 
 const MODELS = [
@@ -63,12 +67,28 @@ const MODELS = [
 	{ "id": "Llama-3.2-3B-Instruct-q4f16_1-MLC", "label": "Llama 3.2 3B (Grandmaster)" }
 ]
 
+const THEME_OPTIONS = [
+	{ "id": "wood", "label": "Classic Hardwood" },
+	{ "id": "marble", "label": "Carrara Marble" },
+	{ "id": "glass", "label": "Crystal Glass" },
+	{ "id": "metal", "label": "Brushed Metal" },
+	{ "id": "cyber", "label": "Cyber Neon" }
+]
+
 func _ready() -> void:
 	_setup_options()
 	_bind_events()
 	_update_tab_selection("minimax")
 	_update_diff_selection("medium")
 	_update_color_selection("red")
+
+	if ThemeManager != null:
+		ThemeManager.theme_changed.connect(_on_theme_changed)
+		_sync_theme_selection(ThemeManager.get_current_theme())
+
+func _exit_tree() -> void:
+	if ThemeManager != null and ThemeManager.theme_changed.is_connected(_on_theme_changed):
+		ThemeManager.theme_changed.disconnect(_on_theme_changed)
 
 func _setup_options() -> void:
 	if persona_option:
@@ -85,15 +105,38 @@ func _setup_options() -> void:
 
 	if arena_red_type:
 		arena_red_type.clear()
-		arena_red_type.add_item("🏴‍☠️ Captain Redbeard (LLM)")
-		arena_red_type.add_item("⚙️ Minimax Medium")
+		arena_red_type.add_item("Captain Redbeard (LLM)")
+		arena_red_type.add_item("Minimax Medium")
 		arena_red_type.selected = 0
 
 	if arena_black_type:
 		arena_black_type.clear()
-		arena_black_type.add_item("🧐 Lord Worthington (LLM)")
-		arena_black_type.add_item("⚙️ Minimax Medium")
+		arena_black_type.add_item("Lord Worthington (LLM)")
+		arena_black_type.add_item("Minimax Medium")
 		arena_black_type.selected = 0
+
+	if theme_option:
+		theme_option.clear()
+		for opt in THEME_OPTIONS:
+			theme_option.add_item(opt.label)
+		theme_option.item_selected.connect(_on_theme_option_selected)
+
+func _on_theme_option_selected(index: int) -> void:
+	if index >= 0 and index < THEME_OPTIONS.size():
+		var id = THEME_OPTIONS[index].id
+		if ThemeManager != null:
+			ThemeManager.set_theme(id)
+
+func _on_theme_changed(theme_id: String) -> void:
+	_sync_theme_selection(theme_id)
+
+func _sync_theme_selection(theme_id: String) -> void:
+	if theme_option == null:
+		return
+	for i in range(THEME_OPTIONS.size()):
+		if THEME_OPTIONS[i].id == theme_id:
+			theme_option.selected = i
+			break
 
 func _bind_events() -> void:
 	# Tab buttons

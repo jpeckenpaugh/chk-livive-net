@@ -1,27 +1,56 @@
-[gd_scene load_steps=8 format=3 uid="uid://d3x7kpiece001"]
+[gd_scene load_steps=12 format=3 uid="uid://d3x7kpiece001"]
 
 [ext_resource type="Script" path="res://scripts/piece_view.gd" id="1_piece_view"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_red"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_default_body"]
 albedo_color = Color(0.72, 0.11, 0.11, 1)
 metallic = 0.1
 roughness = 0.25
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gold"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_default_accent"]
+albedo_color = Color(0.85, 0.25, 0.25, 1)
+metallic = 0.15
+roughness = 0.2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_default_crown"]
 albedo_color = Color(0.95, 0.75, 0.25, 1)
-metallic = 0.7
-roughness = 0.3
+metallic = 0.85
+roughness = 0.25
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_body"]
 top_radius = 0.38
 bottom_radius = 0.38
-height = 0.14
+height = 0.12
+radial_segments = 36
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_bottom_rim"]
+top_radius = 0.38
+bottom_radius = 0.35
+height = 0.02
+radial_segments = 36
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_annular_ridge"]
+top_radius = 0.365
+bottom_radius = 0.365
+height = 0.025
+radial_segments = 36
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_center_dish"]
+top_radius = 0.24
+bottom_radius = 0.24
+height = 0.015
 radial_segments = 32
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_accent_ring"]
+top_radius = 0.31
+bottom_radius = 0.31
+height = 0.026
+radial_segments = 36
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_crown"]
 top_radius = 0.18
 bottom_radius = 0.22
-height = 0.06
+height = 0.08
 radial_segments = 24
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_piece"]
@@ -32,15 +61,35 @@ radius = 0.44
 script = ExtResource("1_piece_view")
 
 [node name="BodyMesh" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.07, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.06, 0)
 mesh = SubResource("CylinderMesh_body")
-surface_material_override/0 = SubResource("StandardMaterial3D_red")
+surface_material_override/0 = SubResource("StandardMaterial3D_default_body")
+
+[node name="BottomRimMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, 0)
+mesh = SubResource("CylinderMesh_bottom_rim")
+surface_material_override/0 = SubResource("StandardMaterial3D_default_body")
+
+[node name="AnnularRidge" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.122, 0)
+mesh = SubResource("CylinderMesh_annular_ridge")
+surface_material_override/0 = SubResource("StandardMaterial3D_default_body")
+
+[node name="CenterDish" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.118, 0)
+mesh = SubResource("CylinderMesh_center_dish")
+surface_material_override/0 = SubResource("StandardMaterial3D_default_body")
+
+[node name="AccentRing" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.123, 0)
+mesh = SubResource("CylinderMesh_accent_ring")
+surface_material_override/0 = SubResource("StandardMaterial3D_default_accent")
 
 [node name="CrownMesh" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.17, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.18, 0)
 visible = false
 mesh = SubResource("CylinderMesh_crown")
-surface_material_override/0 = SubResource("StandardMaterial3D_gold")
+surface_material_override/0 = SubResource("StandardMaterial3D_default_crown")
 
 [node name="Area3D" type="Area3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)

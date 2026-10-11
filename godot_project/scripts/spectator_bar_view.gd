@@ -37,7 +37,7 @@ func _on_spectator_mode_changed(active: bool, paused: bool) -> void:
 
 func _update_play_pause_ui() -> void:
 	if btn_play_pause:
-		btn_play_pause.text = "▶ Play" if _is_paused else "⏸ Pause"
+		btn_play_pause.text = "Play" if _is_paused else "Pause"
 
 func _on_play_pause_pressed() -> void:
 	if _is_paused:

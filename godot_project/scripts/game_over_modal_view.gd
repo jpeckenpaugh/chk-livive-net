@@ -50,13 +50,13 @@ func _display_results(winner, data: Dictionary) -> void:
 	var w: int = int(winner)
 	if title_label:
 		if w == 1:
-			title_label.text = "🏆 RED WINS!"
+			title_label.text = "RED WINS!"
 			title_label.modulate = Color(0.91, 0.3, 0.24)
 		elif w == -1:
-			title_label.text = "🏆 BLACK WINS!"
+			title_label.text = "BLACK WINS!"
 			title_label.modulate = Color(0.85, 0.85, 0.9)
 		else:
-			title_label.text = "🤝 MATCH DRAW!"
+			title_label.text = "MATCH DRAW!"
 			title_label.modulate = Color(0.96, 0.69, 0.25)
 
 	# Win reason

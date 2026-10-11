@@ -81,7 +81,7 @@ alignment = 1
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.69, 0.25, 1)
 theme_override_font_sizes/font_size = 16
-text = "🧠 NEURAL MODEL PREPARATION"
+text = "NEURAL MODEL PREPARATION"
 horizontal_alignment = 1
 
 [node name="Subtitle" type="Label" parent="Backdrop/Card/Margin/VBox"]
@@ -121,4 +121,4 @@ layout_mode = 2
 [node name="BtnFallbackMinimax" type="Button" parent="Backdrop/Card/Margin/VBox"]
 custom_minimum_size = Vector2(0, 36)
 layout_mode = 2
-text = "⚡ Switch to Minimax (Instant Play)"
+text = "Switch to Minimax (Instant Play)"

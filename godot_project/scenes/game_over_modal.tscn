@@ -86,7 +86,7 @@ alignment = 1
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.69, 0.25, 1)
 theme_override_font_sizes/font_size = 22
-text = "🏆 RED WINS!"
+text = "RED WINS!"
 horizontal_alignment = 1
 
 [node name="ReasonBadge" type="PanelContainer" parent="Backdrop/Dialog/Margin/VBox"]
@@ -146,7 +146,7 @@ text = "03:12"
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.65, 0.6, 1)
 theme_override_font_sizes/font_size = 12
-text = "🔴 Red Captures:"
+text = "Red Captures:"
 
 [node name="StatRedCaptures" type="Label" parent="Backdrop/Dialog/Margin/VBox/StatsBox/Grid"]
 layout_mode = 2
@@ -158,7 +158,7 @@ text = "6"
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.65, 0.6, 1)
 theme_override_font_sizes/font_size = 12
-text = "⚫ Black Captures:"
+text = "Black Captures:"
 
 [node name="StatBlackCaptures" type="Label" parent="Backdrop/Dialog/Margin/VBox/StatsBox/Grid"]
 layout_mode = 2
@@ -170,7 +170,7 @@ text = "4"
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.65, 0.6, 1)
 theme_override_font_sizes/font_size = 12
-text = "👑 Kings Crowned:"
+text = "Kings Crowned:"
 
 [node name="StatKings" type="Label" parent="Backdrop/Dialog/Margin/VBox/StatsBox/Grid"]
 layout_mode = 2
@@ -186,14 +186,14 @@ alignment = 1
 [node name="BtnPlayAgain" type="Button" parent="Backdrop/Dialog/Margin/VBox/Actions"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "↺ Play Again"
+text = "Play Again"
 
 [node name="BtnGameModes" type="Button" parent="Backdrop/Dialog/Margin/VBox/Actions"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "☰ Modes"
+text = "Modes"
 
 [node name="BtnReviewBoard" type="Button" parent="Backdrop/Dialog/Margin/VBox/Actions"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "🔍 Review Board"
+text = "Review Board"

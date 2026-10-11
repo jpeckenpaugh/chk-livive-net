@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/hud_view.gd" id="1_hud"]
 
@@ -29,6 +29,34 @@ corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
 shadow_size = 6
 shadow_color = Color(0, 0, 0, 0.45)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_badge_red"]
+bg_color = Color(0.72, 0.15, 0.15, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.4, 0.35, 0.9)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+shadow_size = 3
+shadow_color = Color(0, 0, 0, 0.4)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_badge_black"]
+bg_color = Color(0.16, 0.18, 0.22, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.65, 0.7, 0.75, 0.9)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+shadow_size = 3
+shadow_color = Color(0, 0, 0, 0.4)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_capsule"]
 bg_color = Color(0.12, 0.1, 0.09, 0.94)
@@ -109,10 +137,19 @@ theme_override_constants/margin_bottom = 8
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="Avatar" type="Label" parent="TopBar/PlayerRedCard/Margin/HBox"]
+[node name="AvatarBadge" type="PanelContainer" parent="TopBar/PlayerRedCard/Margin/HBox"]
+custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
-text = "🔴"
+size_flags_vertical = 4
+theme_override_styles/panel = SubResource("StyleBoxFlat_badge_red")
+
+[node name="Label" type="Label" parent="TopBar/PlayerRedCard/Margin/HBox/AvatarBadge"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 15
+text = "R"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="VBox" type="VBoxContainer" parent="TopBar/PlayerRedCard/Margin/HBox"]
 layout_mode = 2
@@ -135,7 +172,7 @@ visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.69, 0.25, 1)
 theme_override_font_sizes/font_size = 13
-text = "👑 0"
+text = "Kings: 0"
 
 [node name="SpacerLeft" type="Control" parent="TopBar"]
 layout_mode = 2
@@ -193,10 +230,19 @@ theme_override_constants/margin_bottom = 8
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="Avatar" type="Label" parent="TopBar/PlayerBlackCard/Margin/HBox"]
+[node name="AvatarBadge" type="PanelContainer" parent="TopBar/PlayerBlackCard/Margin/HBox"]
+custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
-text = "⚫"
+size_flags_vertical = 4
+theme_override_styles/panel = SubResource("StyleBoxFlat_badge_black")
+
+[node name="Label" type="Label" parent="TopBar/PlayerBlackCard/Margin/HBox/AvatarBadge"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 15
+text = "B"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="VBox" type="VBoxContainer" parent="TopBar/PlayerBlackCard/Margin/HBox"]
 layout_mode = 2
@@ -219,18 +265,18 @@ visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.69, 0.25, 1)
 theme_override_font_sizes/font_size = 13
-text = "👑 0"
+text = "Kings: 0"
 
 [node name="JumpAlert" type="PanelContainer" parent="."]
 visible = false
-custom_minimum_size = Vector2(220, 36)
+custom_minimum_size = Vector2(200, 36)
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -110.0
+offset_left = -100.0
 offset_top = 132.0
-offset_right = 110.0
+offset_right = 100.0
 offset_bottom = 168.0
 grow_horizontal = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_jump_pill")
@@ -246,7 +292,7 @@ theme_override_constants/margin_bottom = 4
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "⚠️ MANDATORY JUMP!"
+text = "MANDATORY JUMP!"
 horizontal_alignment = 1
 
 [node name="BanterContainer" type="Control" parent="."]
@@ -283,13 +329,13 @@ theme_override_constants/separation = 4
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.69, 0.25, 1)
 theme_override_font_sizes/font_size = 12
-text = "💬 BANTER ▼"
+text = "BANTER ▼"
 
 [node name="TextLabel" type="Label" parent="BanterContainer/SpeechBubbleRed/Margin/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.98, 0.95, 0.9, 1)
 theme_override_font_sizes/font_size = 15
-text = "Ahoy! Let's see what moves ye have!"
+text = "Let us see what moves you have."
 autowrap_mode = 2
 
 [node name="SpeechBubbleBlack" type="PanelContainer" parent="BanterContainer"]
@@ -321,14 +367,14 @@ theme_override_constants/separation = 4
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.69, 0.25, 1)
 theme_override_font_sizes/font_size = 12
-text = "💬 BANTER ▼"
+text = "BANTER ▼"
 horizontal_alignment = 2
 
 [node name="TextLabel" type="Label" parent="BanterContainer/SpeechBubbleBlack/Margin/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.98, 0.95, 0.9, 1)
 theme_override_font_sizes/font_size = 15
-text = "An intriguing move indeed, my good sir."
+text = "An intriguing move indeed."
 autowrap_mode = 2
 
 [node name="Toolbar" type="PanelContainer" parent="."]
@@ -338,7 +384,7 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -580.0
+offset_left = -660.0
 offset_top = -62.0
 offset_right = -16.0
 offset_bottom = -14.0
@@ -358,38 +404,44 @@ layout_mode = 2
 theme_override_constants/separation = 8
 
 [node name="BtnFlip" type="Button" parent="Toolbar/Margin/HBox"]
+custom_minimum_size = Vector2(72, 36)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Flip"
+
+[node name="BtnNotation" type="Button" parent="Toolbar/Margin/HBox"]
+custom_minimum_size = Vector2(88, 36)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Notation"
+
+[node name="BtnMute" type="Button" parent="Toolbar/Margin/HBox"]
+custom_minimum_size = Vector2(80, 36)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Sound"
+
+[node name="BtnTheme" type="Button" parent="Toolbar/Margin/HBox"]
 custom_minimum_size = Vector2(76, 36)
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
-text = "🔄 Flip"
-
-[node name="BtnNotation" type="Button" parent="Toolbar/Margin/HBox"]
-custom_minimum_size = Vector2(96, 36)
-layout_mode = 2
-theme_override_font_sizes/font_size = 14
-text = "🔢 Notation"
-
-[node name="BtnMute" type="Button" parent="Toolbar/Margin/HBox"]
-custom_minimum_size = Vector2(84, 36)
-layout_mode = 2
-theme_override_font_sizes/font_size = 14
-text = "🔊 Sound"
+text = "Theme"
 
 [node name="BtnReset" type="Button" parent="Toolbar/Margin/HBox"]
-custom_minimum_size = Vector2(78, 36)
+custom_minimum_size = Vector2(72, 36)
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
-text = "↺ Reset"
+text = "Reset"
 
 [node name="BtnMenu" type="Button" parent="Toolbar/Margin/HBox"]
-custom_minimum_size = Vector2(84, 36)
+custom_minimum_size = Vector2(76, 36)
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
-text = "☰ Modes"
+text = "Modes"
 
 [node name="BtnRecap" type="Button" parent="Toolbar/Margin/HBox"]
 visible = false
-custom_minimum_size = Vector2(110, 36)
+custom_minimum_size = Vector2(100, 36)
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
-text = "🏆 View Recap"
+text = "Recap"
