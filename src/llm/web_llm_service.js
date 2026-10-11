@@ -34,6 +34,20 @@ export class WebLLMService {
 
     this._customEngine = null; // Injected for unit testing
     this._customImportFn = null; // Injected for CDN testing
+    this._inferenceLock = Promise.resolve();
+  }
+
+  /**
+   * Interrupts any active in-flight LLM inference on the WebGPU engine.
+   */
+  interrupt() {
+    try {
+      if (this.engine && typeof this.engine.interruptGenerate === 'function') {
+        this.engine.interruptGenerate();
+      }
+    } catch (e) {
+      this._log(`Failed to interrupt generation: ${e.message}`, 'warn');
+    }
   }
 
   /**
@@ -340,7 +354,8 @@ export class WebLLMService {
   }
 
   /**
-   * Executes a chat completion query.
+   * Executes a chat completion query through a sequential mutex lock,
+   * protecting against concurrent WebGPU pipeline conflicts and hanging.
    * @param {Object} options
    * @param {Array<Object>} options.messages
    * @param {number} [options.temperature=0.1]
@@ -348,6 +363,7 @@ export class WebLLMService {
    * @param {boolean} [options.stream=false]
    * @param {Function} [options.onToken] - Streaming token callback
    * @param {AbortSignal} [options.signal]
+   * @param {number} [options.timeoutMs=15000]
    * @returns {Promise<string>} Full response string
    */
   async chatCompletion({
@@ -356,7 +372,8 @@ export class WebLLMService {
     max_tokens = 80,
     stream = false,
     onToken = null,
-    signal = null
+    signal = null,
+    timeoutMs = 15000
   }) {
     if (signal && signal.aborted) {
       throw new Error('Chat completion aborted');
@@ -366,40 +383,104 @@ export class WebLLMService {
       throw new Error('LLM Engine not initialized. Call loadModel() first.');
     }
 
-    try {
-      if (stream && onToken) {
-        const chunks = await this.engine.chat.completions.create({
+    // Queue sequentially so only ONE inference runs on WebGPU at a time
+    const executeNext = () => this._executeChatCompletion({
+      messages,
+      temperature,
+      max_tokens,
+      stream,
+      onToken,
+      signal,
+      timeoutMs
+    });
+
+    const currentLock = this._inferenceLock;
+    const taskPromise = currentLock.then(executeNext, executeNext);
+    this._inferenceLock = taskPromise.catch(() => {});
+    return await taskPromise;
+  }
+
+  /**
+   * Internal execution with hard timeout and engine interrupt protection.
+   * @private
+   */
+  async _executeChatCompletion({
+    messages,
+    temperature,
+    max_tokens,
+    stream,
+    onToken,
+    signal,
+    timeoutMs
+  }) {
+    if (signal && signal.aborted) {
+      throw new Error('Chat completion aborted');
+    }
+
+    let timeoutId = null;
+    let abortListener = null;
+
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        this.interrupt();
+        reject(new Error(`LLM inference timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      if (signal) {
+        abortListener = () => {
+          this.interrupt();
+          reject(new Error('Chat completion aborted'));
+        };
+        signal.addEventListener('abort', abortListener, { once: true });
+      }
+    });
+
+    const completionPromise = (async () => {
+      try {
+        if (stream && onToken) {
+          const chunks = await this.engine.chat.completions.create({
+            messages,
+            temperature,
+            max_tokens,
+            stream: true
+          });
+
+          let accumulated = '';
+          for await (const chunk of chunks) {
+            if (signal && signal.aborted) {
+              this.interrupt();
+              throw new Error('Chat completion aborted');
+            }
+            const delta = chunk.choices[0]?.delta?.content || '';
+            if (delta) {
+              accumulated += delta;
+              onToken(delta, accumulated);
+            }
+          }
+          return accumulated;
+        }
+
+        const response = await this.engine.chat.completions.create({
           messages,
           temperature,
-          max_tokens,
-          stream: true
+          max_tokens
         });
 
-        let accumulated = '';
-        for await (const chunk of chunks) {
-          if (signal && signal.aborted) {
-            throw new Error('Chat completion aborted');
-          }
-          const delta = chunk.choices[0]?.delta?.content || '';
-          if (delta) {
-            accumulated += delta;
-            onToken(delta, accumulated);
-          }
-        }
-        return accumulated;
+        return response.choices[0]?.message?.content || '';
+      } catch (err) {
+        this._log(`Chat completion failed: ${err.message}`, 'error');
+        this._notifyError(err);
+        throw err;
       }
+    })();
 
-      const response = await this.engine.chat.completions.create({
-        messages,
-        temperature,
-        max_tokens
-      });
-
-      return response.choices[0]?.message?.content || '';
-    } catch (err) {
-      this._log(`Chat completion failed: ${err.message}`, 'error');
-      this._notifyError(err);
-      throw err;
+    try {
+      return await Promise.race([completionPromise, timeoutPromise]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (signal && abortListener) {
+        signal.removeEventListener('abort', abortListener);
+      }
     }
   }
 

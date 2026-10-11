@@ -64,6 +64,11 @@ export class LLMWorkerBridge {
     if (this.mockMode || this.workerFailed) return false;
     if (this._customEngine !== null) return false;
     if (typeof window === 'undefined' || typeof Worker === 'undefined') return false;
+    try {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('chk_prefer_in_process') === 'true') {
+        return false;
+      }
+    } catch (_) {}
     return true;
   }
 
@@ -284,6 +289,11 @@ export class LLMWorkerBridge {
         } catch (workerErr) {
           console.warn('[LLMWorkerBridge] Web Worker initialization failed. Automatically switching to in-process WebLLM (rag-poc engine mode):', workerErr);
           this.workerFailed = true;
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('chk_prefer_in_process', 'true');
+            }
+          } catch (_) {}
           if (this.worker) {
             try { this.worker.terminate(); } catch (_) {}
             this.worker = null;
@@ -496,7 +506,8 @@ export class LLMWorkerBridge {
           messages: msgs,
           temperature: 0.1,
           max_tokens: 60,
-          signal
+          signal,
+          timeoutMs: 12000
         });
         rawResponse = res;
         return res;
@@ -667,10 +678,11 @@ export class LLMWorkerBridge {
         const res = await this.service.chatCompletion({
           messages,
           temperature: 0.85,
-          max_tokens: 50,
+          max_tokens: 35,
           stream: Boolean(onToken),
           onToken,
-          signal
+          signal,
+          timeoutMs: 7000
         });
 
         const latencyMs = Math.max(1, Date.now() - startTime);

@@ -133,8 +133,11 @@ export async function executeMoveSelectionWithRetries({
         messages.push(buildTacticalRetryPrompt(legalMoves.length, parsed.error));
       }
     } catch (err) {
+      if (err && err.message && (err.message.includes('aborted') || err.message.includes('timed out'))) {
+        break;
+      }
       if (attempts > maxRetries) break;
-      // On network / abort error during retry, allow loop or break
+      // On network / format error during retry, allow loop or break
     }
   }
 

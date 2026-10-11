@@ -1310,21 +1310,23 @@ export class CheckersController {
 
         const chosenMove = result.move;
 
-        // If active player is an LLMPlayer, trigger concurrent personality banter streaming
-        if (activePlayer instanceof LLMPlayer && typeof activePlayer.streamBanter === 'function') {
+        // If active player is an LLMPlayer, stream personality banter sequentially before executing move
+        if (activePlayer instanceof LLMPlayer && typeof activePlayer.streamBanter === 'function' && !this.state.mustContinueJumpFrom) {
           const moveDesc = formatMoveDescription(chosenMove);
-          activePlayer.streamBanter({
-            move: chosenMove,
-            board: this.state.board,
-            turn: this.state.turn,
-            crowned: false,
-            onToken: (delta, full) => {
-              if (this.renderer && typeof this.renderer.streamBanter === 'function') {
-                this.renderer.streamBanter(this.state.turn, full);
-              }
-            },
-            signal: currentSignal
-          }).then((banter) => {
+          try {
+            const banter = await activePlayer.streamBanter({
+              move: chosenMove,
+              board: this.state.board,
+              turn: this.state.turn,
+              crowned: false,
+              onToken: (delta, full) => {
+                if (this.renderer && typeof this.renderer.streamBanter === 'function') {
+                  this.renderer.streamBanter(this.state.turn, full);
+                }
+              },
+              signal: currentSignal
+            });
+
             if (banter && this.renderer && typeof this.renderer.addBanterToFeed === 'function') {
               this.renderer.addBanterToFeed({
                 color: activePlayer.color,
@@ -1334,9 +1336,12 @@ export class CheckersController {
                 moveDesc
               });
             }
-          }).catch(() => {});
+          } catch (banterErr) {
+            // Non-critical: banter failure or abort does not block the move
+          }
         }
 
+        if (currentSignal.aborted) return;
         this.executeMove(chosenMove);
       } catch (err) {
         if (!currentSignal.aborted) {
