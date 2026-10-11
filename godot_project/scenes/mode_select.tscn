@@ -90,7 +90,7 @@ text = "CHOOSE GAME MODE"
 [node name="BtnClose" type="Button" parent="Backdrop/Dialog/Margin/VBox/Header"]
 custom_minimum_size = Vector2(30, 30)
 layout_mode = 2
-text = "✕"
+text = "X"
 
 [node name="TabButtons" type="HBoxContainer" parent="Backdrop/Dialog/Margin/VBox"]
 layout_mode = 2

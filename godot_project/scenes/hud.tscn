@@ -329,7 +329,7 @@ theme_override_constants/separation = 4
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.69, 0.25, 1)
 theme_override_font_sizes/font_size = 12
-text = "BANTER ▼"
+text = "BANTER"
 
 [node name="TextLabel" type="Label" parent="BanterContainer/SpeechBubbleRed/Margin/VBox"]
 layout_mode = 2
@@ -367,7 +367,7 @@ theme_override_constants/separation = 4
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.69, 0.25, 1)
 theme_override_font_sizes/font_size = 12
-text = "BANTER ▼"
+text = "BANTER"
 horizontal_alignment = 2
 
 [node name="TextLabel" type="Label" parent="BanterContainer/SpeechBubbleBlack/Margin/VBox"]

@@ -259,31 +259,27 @@ func _set_card_active(card: PanelContainer, is_active: bool, is_red: bool) -> vo
 			style.border_width_bottom = 1
 			style.shadow_size = 0
 
-## Strips raw unicode emojis from text to avoid missing glyph hex boxes
+## Strips all raw unicode emojis and missing-glyph symbols to ensure clean text rendering
 func _clean_display_text(raw_text: String) -> String:
 	var cleaned: String = raw_text
-	# Remove known persona emojis and common symbol brackets
-	cleaned = cleaned.replace("(🧐)", "")
-	cleaned = cleaned.replace("(🏴‍☠️)", "")
-	cleaned = cleaned.replace("(🤖)", "")
-	cleaned = cleaned.replace("(⚡)", "")
-	cleaned = cleaned.replace("(👵)", "")
-	cleaned = cleaned.replace("(⚙️)", "")
-	cleaned = cleaned.replace("(🔴)", "")
-	cleaned = cleaned.replace("(⚫)", "")
-	cleaned = cleaned.replace("🧐", "")
-	cleaned = cleaned.replace("🏴‍☠️", "")
-	cleaned = cleaned.replace("🤖", "")
-	cleaned = cleaned.replace("⚡", "")
-	cleaned = cleaned.replace("👵", "")
-	cleaned = cleaned.replace("⚙️", "")
-	cleaned = cleaned.replace("🔴", "")
-	cleaned = cleaned.replace("⚫", "")
-	cleaned = cleaned.replace("💬", "")
-	cleaned = cleaned.replace("👑", "")
-	cleaned = cleaned.replace("⚠️", "")
-	cleaned = cleaned.replace("🏆", "")
-	return cleaned.strip_edges()
+	for emoji in ["(🧐)", "(🏴‍☠️)", "(🤖)", "(⚡)", "(👵)", "(⚙️)", "(🔴)", "(⚫)"]:
+		cleaned = cleaned.replace(emoji, "")
+
+	var result: String = ""
+	for i in range(cleaned.length()):
+		var c: String = cleaned[i]
+		var code: int = c.unicode_at(0)
+		# Allow printable ASCII (32 to 126) and newline (10)
+		if (code >= 32 and code <= 126) or code == 10:
+			result += c
+		elif code == 8217 or code == 8216:
+			result += "'"
+		elif code == 8220 or code == 8221:
+			result += '"'
+		elif code == 8211 or code == 8212:
+			result += "-"
+
+	return result.strip_edges()
 
 func _on_player_info_updated(color: int, info: Dictionary) -> void:
 	var raw_name: String = info.get("name", "")

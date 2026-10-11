@@ -92,7 +92,7 @@ func _set_card_state(card: PanelContainer, btn: Button, is_active: bool) -> void
 			st.shadow_size = 0
 
 	if is_active:
-		btn.text = "Active ✓"
+		btn.text = "Active"
 		btn.disabled = true
 		btn.modulate = Color(1.0, 0.9, 0.6, 1.0)
 	else:
