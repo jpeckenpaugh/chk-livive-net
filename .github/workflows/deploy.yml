@@ -1,0 +1,103 @@
+name: Deploy Checkers 2D + 3D to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    env:
+      GODOT_VERSION: "4.7.2"
+      GODOT_RELEASE: "stable"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Run Test Suite
+        run: npm test
+
+      - name: Cache Godot Binary & Export Templates
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/godot
+            /usr/local/bin/godot
+          key: godot-${{ env.GODOT_VERSION }}-${{ env.GODOT_RELEASE }}-web
+
+      - name: Install Godot & Web Export Templates
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          GODOT_PKG="Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_linux.x86_64"
+          TEMPLATES_PKG="Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_export_templates.tpz"
+
+          echo "Downloading Godot Editor binary..."
+          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-${GODOT_RELEASE}/${GODOT_PKG}.zip"
+          unzip -q "${GODOT_PKG}.zip"
+          sudo mv "${GODOT_PKG}" /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+          rm "${GODOT_PKG}.zip"
+
+          echo "Downloading Godot Export Templates..."
+          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-${GODOT_RELEASE}/${TEMPLATES_PKG}"
+          unzip -q "${TEMPLATES_PKG}"
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}"
+          mv templates/* "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}/"
+          rm -rf "${TEMPLATES_PKG}" templates
+
+      - name: Build Godot 3D Web Client
+        run: |
+          mkdir -p godot
+          godot --headless --path godot_project --export-release "Web" ../godot/index.html
+          echo "Verified Godot artifacts:"
+          ls -lh godot/
+
+      - name: Assemble GitHub Pages Distribution
+        run: |
+          mkdir -p _site
+          # Copy 2D client and static web assets to site root
+          cp index.html styles.css favicon.* _site/
+          cp -r src _site/
+          if [ -f CNAME ]; then cp CNAME _site/; fi
+          # Copy Godot 3D client to /godot/ subdirectory
+          cp -r godot _site/godot
+          echo "Assembled site structure:"
+          ls -la _site/
+          ls -la _site/godot/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: test-and-build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
