@@ -7,7 +7,13 @@
 
 import { webLLMService } from './web_llm_service.js';
 import { checkWebGPUSupport } from './gpu_check.js';
-import { SUPPORTED_MODELS, DEFAULT_MODEL_ID, getModelInfo } from './model_registry.js';
+import {
+  SUPPORTED_MODELS,
+  DEFAULT_MODEL_ID,
+  getModelInfo,
+  getPreferredModelId,
+  setPreferredModelId
+} from './model_registry.js';
 
 export class LLMDashboard {
   /**
@@ -105,11 +111,13 @@ export class LLMDashboard {
     if (!this.selectModel) return;
     this.selectModel.innerHTML = '';
 
+    const initialModelId = this.service.currentModelId || getPreferredModelId();
+
     SUPPORTED_MODELS.forEach((m) => {
       const opt = document.createElement('option');
       opt.value = m.id;
       opt.textContent = `${m.name} (${m.vram} VRAM)`;
-      if (m.id === (this.service.currentModelId || DEFAULT_MODEL_ID)) {
+      if (m.id === initialModelId) {
         opt.selected = true;
       }
       this.selectModel.appendChild(opt);
@@ -147,7 +155,15 @@ export class LLMDashboard {
 
     if (this.selectModel) {
       this.selectModel.addEventListener('change', (e) => {
-        this._updateModelMetadataDisplay(e.target.value);
+        const chosenId = e.target.value;
+        this._updateModelMetadataDisplay(chosenId);
+        setPreferredModelId(chosenId);
+
+        // Also synchronize arena-model dropdown if present in DOM
+        const arenaModelSelect = document.getElementById('arena-model');
+        if (arenaModelSelect) {
+          arenaModelSelect.value = chosenId;
+        }
       });
     }
 

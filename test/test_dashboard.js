@@ -12,6 +12,52 @@ import { WebLLMService, WEBLLM_CDN_URLS } from '../src/llm/web_llm_service.js';
 import { LLMDashboard } from '../src/llm/dashboard.js';
 import { CheckersController } from '../src/controller.js';
 import { PLAYER_RED, PLAYER_BLACK } from '../src/state.js';
+import {
+  DEFAULT_MODEL_ID,
+  STORAGE_KEY_PREFERRED_MODEL,
+  getPreferredModelId,
+  setPreferredModelId
+} from '../src/llm/model_registry.js';
+
+test('Model Preferences - Default Model is Llama 3.2 1B', (t) => {
+  assert.equal(DEFAULT_MODEL_ID, 'Llama-3.2-1B-Instruct-q4f16_1-MLC');
+});
+
+test('Model Preferences - Storage Persistence and Fallback', (t) => {
+  const mockStorage = new Map();
+  const mockLocalStorage = {
+    getItem: (key) => mockStorage.get(key) || null,
+    setItem: (key, val) => mockStorage.set(key, String(val))
+  };
+
+  // Test with custom storage
+  const originalLocalStorage = globalThis.localStorage;
+  try {
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: mockLocalStorage,
+      configurable: true,
+      writable: true
+    });
+
+    // Default fallback when empty
+    assert.equal(getPreferredModelId(), 'Llama-3.2-1B-Instruct-q4f16_1-MLC');
+
+    // Save preference
+    setPreferredModelId('SmolLM2-360M-Instruct-q4f16_1-MLC');
+    assert.equal(getPreferredModelId(), 'SmolLM2-360M-Instruct-q4f16_1-MLC');
+    assert.equal(mockStorage.get(STORAGE_KEY_PREFERRED_MODEL), 'SmolLM2-360M-Instruct-q4f16_1-MLC');
+
+    // Invalid model ID does not overwrite
+    setPreferredModelId('non-existent-model');
+    assert.equal(getPreferredModelId(), 'SmolLM2-360M-Instruct-q4f16_1-MLC');
+  } finally {
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: originalLocalStorage,
+      configurable: true,
+      writable: true
+    });
+  }
+});
 
 test('Hardware & WebGPU Detection - Environment without navigator.gpu', async (t) => {
   // In Node.js environment without navigator.gpu

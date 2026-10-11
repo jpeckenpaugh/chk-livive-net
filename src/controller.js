@@ -29,7 +29,7 @@ import { LLMPlayer } from './players/llm_player.js';
 import { webLLMService } from './llm/web_llm_service.js';
 import { checkWebGPUSupport } from './llm/gpu_check.js';
 import { formatMoveDescription } from './llm/prompts.js';
-import { DEFAULT_MODEL_ID } from './llm/model_registry.js';
+import { DEFAULT_MODEL_ID, getPreferredModelId, setPreferredModelId } from './llm/model_registry.js';
 import { DEFAULT_PERSONA_RED, DEFAULT_PERSONA_BLACK } from './llm/personas.js';
 
 export class CheckersController {
@@ -63,7 +63,7 @@ export class CheckersController {
     this.difficulty = 'medium';
 
     // Model & Tactical settings
-    this.modelId = DEFAULT_MODEL_ID;
+    this.modelId = getPreferredModelId();
     this.tacticalMode = 'wild'; // 'wild' | 'grandmaster'
 
     // Spectator Controls (AI vs AI / LLM vs LLM)
@@ -281,6 +281,15 @@ export class CheckersController {
       });
     }
 
+    // Synchronize arena-model select dropdown with preferred model
+    const arenaModelSelect = document.getElementById('arena-model');
+    if (arenaModelSelect) {
+      arenaModelSelect.value = this.modelId;
+      arenaModelSelect.addEventListener('change', (e) => {
+        setPreferredModelId(e.target.value);
+      });
+    }
+
     // Matchup setup modal triggers
     const btnOpenArena = document.getElementById('btn-arena-setup');
     const modalArena = document.getElementById('modal-arena-setup');
@@ -289,6 +298,10 @@ export class CheckersController {
 
     if (btnOpenArena && modalArena) {
       btnOpenArena.addEventListener('click', () => {
+        // Ensure current preferred model is selected when opening modal
+        if (arenaModelSelect) {
+          arenaModelSelect.value = this.modelId;
+        }
         modalArena.classList.remove('hidden');
       });
     }
@@ -326,8 +339,11 @@ export class CheckersController {
     const redPersona = document.getElementById('arena-red-persona')?.value || DEFAULT_PERSONA_RED;
     const blackType = document.getElementById('arena-black-type')?.value || 'llm';
     const blackPersona = document.getElementById('arena-black-persona')?.value || DEFAULT_PERSONA_BLACK;
-    const modelId = document.getElementById('arena-model')?.value || DEFAULT_MODEL_ID;
+    const modelId = document.getElementById('arena-model')?.value || this.modelId || DEFAULT_MODEL_ID;
     const tacticalMode = document.getElementById('arena-tactical-mode')?.value || 'wild';
+
+    // Persist preferred model selection
+    setPreferredModelId(modelId);
 
     this.configureMatchup({
       redType,
@@ -353,6 +369,7 @@ export class CheckersController {
   }) {
     this.modelId = modelId;
     this.tacticalMode = tacticalMode;
+    setPreferredModelId(modelId);
 
     // Configure Red Player
     let redPlayer;

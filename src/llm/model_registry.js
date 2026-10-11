@@ -38,7 +38,9 @@ export const SUPPORTED_MODELS = [
   }
 ];
 
-export const DEFAULT_MODEL_ID = 'SmolLM2-1.7B-Instruct-q4f16_1-MLC';
+export const DEFAULT_MODEL_ID = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
+
+export const STORAGE_KEY_PREFERRED_MODEL = 'godot_checkers_preferred_model';
 
 /**
  * Returns metadata for a model ID.
@@ -47,4 +49,38 @@ export const DEFAULT_MODEL_ID = 'SmolLM2-1.7B-Instruct-q4f16_1-MLC';
  */
 export function getModelInfo(id) {
   return SUPPORTED_MODELS.find((m) => m.id === id) || null;
+}
+
+/**
+ * Gets the preferred model ID from localStorage, falling back to DEFAULT_MODEL_ID.
+ * @returns {string}
+ */
+export function getPreferredModelId() {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_PREFERRED_MODEL);
+      if (saved && SUPPORTED_MODELS.some((m) => m.id === saved)) {
+        return saved;
+      }
+    } catch (e) {
+      // localStorage may be inaccessible in certain sandbox / privacy modes
+    }
+  }
+  return DEFAULT_MODEL_ID;
+}
+
+/**
+ * Saves the preferred model ID to localStorage.
+ * @param {string} modelId
+ */
+export function setPreferredModelId(modelId) {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      if (SUPPORTED_MODELS.some((m) => m.id === modelId)) {
+        localStorage.setItem(STORAGE_KEY_PREFERRED_MODEL, modelId);
+      }
+    } catch (e) {
+      // localStorage may be inaccessible
+    }
+  }
 }
