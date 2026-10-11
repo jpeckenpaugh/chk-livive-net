@@ -1,0 +1,12 @@
+# Godot 4 Web Client build output (tracked via Option B: built on-the-fly / CI)
+/godot/
+
+# Godot 4 project cache & imported assets
+.godot/
+**/.godot/
+*.translation
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+node_modules/

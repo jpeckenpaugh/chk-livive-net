@@ -4,7 +4,8 @@
   "description": "Client-side, zero-dependency browser-based Checkers (English Draughts)",
   "type": "module",
   "scripts": {
-    "test": "node --test test/test_*.js"
+    "test": "node --test test/test_*.js",
+    "build:godot": "bash scripts/build_godot.sh"
   },
   "keywords": ["checkers", "draughts", "game", "browser"],
   "author": "",

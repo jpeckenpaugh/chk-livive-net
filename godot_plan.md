@@ -60,7 +60,7 @@ Build an alternate, 3D Web frontend for **English Draughts (Checkers)** using **
   3. Create a headless build script (`scripts/build_godot.sh`) calling the local Godot 4.7 binary (`/Applications/Godot.app/Contents/MacOS/Godot --headless --export-release "Web" ...`).
   4. Ensure build artifacts output to `/godot/` (`/godot/index.html`, `/godot/checkers.wasm`, `/godot/checkers.pck`, `/godot/checkers.js`).
   5. Verify dual serving: `/` boots the 2D client; `/godot/` boots the 3D client.
-- **Status:** `[PENDING]`
+- **Status:** `[COMPLETED]`
 
 ### **Section 2: Bidirectional JavaScript Bridge & Interface Contract**
 - **Goal:** Establish a robust communication layer connecting the JS game controller to the Godot WebAssembly runtime.
