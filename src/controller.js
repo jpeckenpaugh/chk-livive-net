@@ -147,7 +147,19 @@ export class CheckersController {
 
     if (this.renderer && typeof this.renderer.setPlayerInfo === 'function') {
       const avatar = playerInstance.persona ? playerInstance.persona.avatar : (color === PLAYER_RED ? '🔴' : '⚫');
-      this.renderer.setPlayerInfo(color, { name: playerInstance.name, avatar });
+      const persona = playerInstance.persona;
+      const isRed = (color === PLAYER_RED);
+      const isCpu = (playerInstance.type === 'minimax');
+      const badgeText = persona?.badgeText || (isCpu ? 'CPU' : (isRed ? 'R' : 'B'));
+      const badgeBg = persona?.badgeBg || (isCpu ? '#1c2430' : (isRed ? '#721515' : '#2e333d'));
+      const badgeBorder = persona?.badgeBorder || (isCpu ? '#4a729e' : (isRed ? '#ff6659' : '#b3bfc8'));
+      this.renderer.setPlayerInfo(color, {
+        name: playerInstance.name,
+        avatar,
+        badgeText,
+        badgeBg,
+        badgeBorder
+      });
     }
   }
 
@@ -689,16 +701,18 @@ export class CheckersController {
     } else if (mode === 'arena') {
       const redType = config.arenaRedType || 'llm';
       const redPersona = config.arenaRedPersona || DEFAULT_PERSONA_RED;
+      const redDiff = config.arenaRedDifficulty || config.difficulty || this.difficulty;
       const blackType = config.arenaBlackType || 'llm';
       const blackPersona = config.arenaBlackPersona || DEFAULT_PERSONA_BLACK;
+      const blackDiff = config.arenaBlackDifficulty || config.difficulty || this.difficulty;
 
       let redPlayer;
       if (redType === 'minimax') {
         redPlayer = new MinimaxPlayer({
           id: 'player-red',
-          name: `Red (Minimax ${this.difficulty})`,
+          name: `Red (Minimax ${redDiff})`,
           color: PLAYER_RED,
-          difficulty: this.difficulty
+          difficulty: redDiff
         });
       } else {
         redPlayer = new LLMPlayer({
@@ -714,9 +728,9 @@ export class CheckersController {
       if (blackType === 'minimax') {
         blackPlayer = new MinimaxPlayer({
           id: 'player-black',
-          name: `Black (Minimax ${this.difficulty})`,
+          name: `Black (Minimax ${blackDiff})`,
           color: PLAYER_BLACK,
-          difficulty: this.difficulty
+          difficulty: blackDiff
         });
       } else {
         blackPlayer = new LLMPlayer({
@@ -1564,10 +1578,29 @@ export class CheckersController {
         this.renderer.hideBanter(PLAYER_BLACK);
       }
       if (typeof this.renderer.setPlayerInfo === 'function') {
-        const redAvatar = this.players[PLAYER_RED]?.persona?.avatar || '🔴';
-        const blackAvatar = this.players[PLAYER_BLACK]?.persona?.avatar || '⚫';
-        this.renderer.setPlayerInfo(PLAYER_RED, { name: this.players[PLAYER_RED]?.name || 'Red', avatar: redAvatar });
-        this.renderer.setPlayerInfo(PLAYER_BLACK, { name: this.players[PLAYER_BLACK]?.name || 'Black', avatar: blackAvatar });
+        const redP = this.players[PLAYER_RED];
+        const blackP = this.players[PLAYER_BLACK];
+        const redPersona = redP?.persona;
+        const blackPersona = blackP?.persona;
+
+        const redInfo = {
+          name: redP?.name || 'Red',
+          avatar: redPersona?.avatar || '🔴',
+          badgeText: redPersona?.badgeText || (redP?.type === 'minimax' ? 'CPU' : 'R'),
+          badgeBg: redPersona?.badgeBg || (redP?.type === 'minimax' ? '#1c2430' : '#721515'),
+          badgeBorder: redPersona?.badgeBorder || (redP?.type === 'minimax' ? '#4a729e' : '#ff6659')
+        };
+
+        const blackInfo = {
+          name: blackP?.name || 'Black',
+          avatar: blackPersona?.avatar || '⚫',
+          badgeText: blackPersona?.badgeText || (blackP?.type === 'minimax' ? 'CPU' : 'B'),
+          badgeBg: blackPersona?.badgeBg || (blackP?.type === 'minimax' ? '#1c2430' : '#2e333d'),
+          badgeBorder: blackPersona?.badgeBorder || (blackP?.type === 'minimax' ? '#4a729e' : '#b3bfc8')
+        };
+
+        this.renderer.setPlayerInfo(PLAYER_RED, redInfo);
+        this.renderer.setPlayerInfo(PLAYER_BLACK, blackInfo);
       }
     }
 

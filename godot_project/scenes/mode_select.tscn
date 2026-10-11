@@ -51,17 +51,17 @@ grow_vertical = 2
 color = Color(0, 0, 0, 0.65)
 
 [node name="Dialog" type="PanelContainer" parent="Backdrop"]
-custom_minimum_size = Vector2(520, 420)
+custom_minimum_size = Vector2(560, 470)
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -260.0
-offset_top = -210.0
-offset_right = 260.0
-offset_bottom = 210.0
+offset_left = -280.0
+offset_top = -235.0
+offset_right = 280.0
+offset_bottom = 235.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_modal_dialog")
@@ -79,6 +79,7 @@ theme_override_constants/separation = 14
 
 [node name="Header" type="HBoxContainer" parent="Backdrop/Dialog/Margin/VBox"]
 layout_mode = 2
+theme_override_constants/separation = 8
 
 [node name="Title" type="Label" parent="Backdrop/Dialog/Margin/VBox/Header"]
 layout_mode = 2
@@ -86,6 +87,11 @@ size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.96, 0.69, 0.25, 1)
 theme_override_font_sizes/font_size = 18
 text = "CHOOSE GAME MODE"
+
+[node name="BtnRandomize" type="Button" parent="Backdrop/Dialog/Margin/VBox/Header"]
+custom_minimum_size = Vector2(96, 30)
+layout_mode = 2
+text = "Randomize"
 
 [node name="BtnClose" type="Button" parent="Backdrop/Dialog/Margin/VBox/Header"]
 custom_minimum_size = Vector2(30, 30)
@@ -175,6 +181,19 @@ visible = false
 layout_mode = 2
 theme_override_constants/separation = 10
 
+[node name="CategoryHBox" type="HBoxContainer" parent="Backdrop/Dialog/Margin/VBox/ContentPanels/PanelLLM"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Backdrop/Dialog/Margin/VBox/ContentPanels/PanelLLM/CategoryHBox"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Category:"
+
+[node name="CategoryOption" type="OptionButton" parent="Backdrop/Dialog/Margin/VBox/ContentPanels/PanelLLM/CategoryHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
 [node name="PersonaHBox" type="HBoxContainer" parent="Backdrop/Dialog/Margin/VBox/ContentPanels/PanelLLM"]
 layout_mode = 2
 
@@ -249,29 +268,40 @@ text = "Configure Spectator Matchup:"
 
 [node name="RedHBox" type="HBoxContainer" parent="Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena"]
 layout_mode = 2
+theme_override_constants/separation = 8
 
 [node name="Label" type="Label" parent="Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena/RedHBox"]
-custom_minimum_size = Vector2(90, 0)
+custom_minimum_size = Vector2(85, 0)
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "Red Player:"
 
-[node name="RedTypeOption" type="OptionButton" parent="Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena/RedHBox"]
+[node name="RedCategoryOption" type="OptionButton" parent="Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena/RedHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RedSelectionOption" type="OptionButton" parent="Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena/RedHBox"]
 layout_mode = 2
 size_flags_horizontal = 3
 
 [node name="BlackHBox" type="HBoxContainer" parent="Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena"]
 layout_mode = 2
+theme_override_constants/separation = 8
 
 [node name="Label" type="Label" parent="Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena/BlackHBox"]
-custom_minimum_size = Vector2(90, 0)
+custom_minimum_size = Vector2(85, 0)
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "Black Player:"
 
-[node name="BlackTypeOption" type="OptionButton" parent="Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena/BlackHBox"]
+[node name="BlackCategoryOption" type="OptionButton" parent="Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena/BlackHBox"]
 layout_mode = 2
 size_flags_horizontal = 3
+
+[node name="BlackSelectionOption" type="OptionButton" parent="Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena/BlackHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
 
 [node name="ThemeHBox" type="HBoxContainer" parent="Backdrop/Dialog/Margin/VBox"]
 layout_mode = 2

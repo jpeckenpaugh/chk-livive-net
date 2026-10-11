@@ -9,6 +9,9 @@ extends Node3D
 @onready var board: Node3D = $Board
 @onready var pedestal: MeshInstance3D = $BoardPedestal
 @onready var dir_light: DirectionalLight3D = $DirectionalLight3D
+@onready var rim_light: DirectionalLight3D = $RimLight3D
+@onready var studio_floor: MeshInstance3D = $StudioFloor
+@onready var world_env: WorldEnvironment = $WorldEnvironment
 
 @onready var hud: Control = $UI/HUD
 @onready var spectator_bar: Control = $UI/SpectatorBar
@@ -31,7 +34,9 @@ func _ready() -> void:
 
 	if ThemeManager != null:
 		ThemeManager.theme_changed.connect(_on_theme_changed)
+		ThemeManager.environment_mode_changed.connect(_on_env_mode_changed)
 		_apply_pedestal_material()
+		_apply_environment_mode(ThemeManager.get_environment_mode(), false)
 
 	# Connect Autoload Bridge signals
 	if Bridge != null:
@@ -94,6 +99,7 @@ func _on_board_flipped(flipped: bool) -> void:
 	var target_cam_y: float = PI if flipped else 0.0
 	var target_light_y: float = deg_to_rad(210.0) if flipped else deg_to_rad(30.0)
 	var target_light_pos: Vector3 = Vector3(3.5, 12.0, 5.0) if flipped else Vector3(-3.5, 12.0, -5.0)
+	var target_rim_y: float = deg_to_rad(30.0) if flipped else deg_to_rad(210.0)
 
 	_flip_tween = create_tween()
 	_flip_tween.set_parallel(true)
@@ -103,6 +109,8 @@ func _on_board_flipped(flipped: bool) -> void:
 	if dir_light != null:
 		_flip_tween.tween_property(dir_light, "rotation:y", target_light_y, 0.6)
 		_flip_tween.tween_property(dir_light, "position", target_light_pos, 0.6)
+	if rim_light != null:
+		_flip_tween.tween_property(rim_light, "rotation:y", target_rim_y, 0.6)
 
 func _on_show_notation_changed(show: bool) -> void:
 	if board != null and board.has_method("set_show_notation"):
@@ -110,6 +118,75 @@ func _on_show_notation_changed(show: bool) -> void:
 
 func _on_theme_changed(_theme_id: String) -> void:
 	_apply_pedestal_material()
+
+func _on_env_mode_changed(mode: String) -> void:
+	_apply_environment_mode(mode, true)
+
+func _apply_environment_mode(mode: String, animate: bool = true) -> void:
+	var is_light: bool = (mode == "light")
+
+	var target_ambient_col: Color = Color(0.92, 0.94, 0.98) if is_light else Color(0.65, 0.6, 0.55)
+	var target_ambient_nrg: float = 1.25 if is_light else 1.05
+	var target_dir_col: Color = Color(0.98, 0.98, 1.0) if is_light else Color(1.0, 0.96, 0.9)
+	var target_dir_nrg: float = 1.25 if is_light else 1.05
+	var target_rim_col: Color = Color(1.0, 0.95, 0.9) if is_light else Color(0.65, 0.75, 0.95)
+	var target_rim_nrg: float = 0.55 if is_light else 0.45
+	var target_floor_col: Color = Color(0.88, 0.88, 0.92) if is_light else Color(0.06, 0.06, 0.08)
+	var target_sky_top: Color = Color(0.84, 0.87, 0.92) if is_light else Color(0.18, 0.2, 0.24)
+	var target_sky_horiz: Color = Color(0.88, 0.88, 0.92) if is_light else Color(0.1, 0.1, 0.12)
+	var target_gnd_bot: Color = Color(0.80, 0.82, 0.86) if is_light else Color(0.06, 0.06, 0.07)
+
+	var sky_mat: ProceduralSkyMaterial = null
+	if world_env != null and world_env.environment != null and world_env.environment.sky != null:
+		sky_mat = world_env.environment.sky.sky_material as ProceduralSkyMaterial
+
+	if animate:
+		var tween: Tween = create_tween()
+		tween.set_parallel(true)
+		tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+
+		if world_env != null and world_env.environment != null:
+			tween.tween_property(world_env.environment, "ambient_light_color", target_ambient_col, 0.5)
+			tween.tween_property(world_env.environment, "ambient_light_energy", target_ambient_nrg, 0.5)
+		if sky_mat != null:
+			tween.tween_property(sky_mat, "sky_top_color", target_sky_top, 0.5)
+			tween.tween_property(sky_mat, "sky_horizon_color", target_sky_horiz, 0.5)
+			tween.tween_property(sky_mat, "ground_bottom_color", target_gnd_bot, 0.5)
+			tween.tween_property(sky_mat, "ground_horizon_color", target_sky_horiz, 0.5)
+		if dir_light != null:
+			tween.tween_property(dir_light, "light_color", target_dir_col, 0.5)
+			tween.tween_property(dir_light, "light_energy", target_dir_nrg, 0.5)
+		if rim_light != null:
+			tween.tween_property(rim_light, "light_color", target_rim_col, 0.5)
+			tween.tween_property(rim_light, "light_energy", target_rim_nrg, 0.5)
+		if studio_floor != null:
+			var mat = studio_floor.get_surface_override_material(0) as StandardMaterial3D
+			if mat == null:
+				mat = StandardMaterial3D.new()
+				studio_floor.set_surface_override_material(0, mat)
+			tween.tween_property(mat, "albedo_color", target_floor_col, 0.5)
+	else:
+		if world_env != null and world_env.environment != null:
+			world_env.environment.ambient_light_color = target_ambient_col
+			world_env.environment.ambient_light_energy = target_ambient_nrg
+		if sky_mat != null:
+			sky_mat.sky_top_color = target_sky_top
+			sky_mat.sky_horizon_color = target_sky_horiz
+			sky_mat.ground_bottom_color = target_gnd_bot
+			sky_mat.ground_horizon_color = target_sky_horiz
+		if dir_light != null:
+			dir_light.light_color = target_dir_col
+			dir_light.light_energy = target_dir_nrg
+		if rim_light != null:
+			rim_light.light_color = target_rim_col
+			rim_light.light_energy = target_rim_nrg
+		if studio_floor != null:
+			var mat = studio_floor.get_surface_override_material(0) as StandardMaterial3D
+			if mat == null:
+				mat = StandardMaterial3D.new()
+				studio_floor.set_surface_override_material(0, mat)
+			mat.albedo_color = target_floor_col
+
 
 func _apply_pedestal_material() -> void:
 	if pedestal == null or ThemeManager == null:

@@ -11,6 +11,7 @@ extends Node
 ## Persists selection to localStorage in Web builds.
 
 signal theme_changed(theme_id: String)
+signal environment_mode_changed(mode: String)
 
 const THEME_IDS: Array[String] = ["wood", "marble", "glass", "metal", "cyber"]
 
@@ -58,15 +59,33 @@ const THEME_DEFS: Dictionary = {
 }
 
 var _current_theme: String = "wood"
+var _current_env_mode: String = "dark"
 var _materials_cache: Dictionary = {}
 
 func _ready() -> void:
 	_init_all_materials()
+	_current_env_mode = _load_saved_env_mode()
 	var initial_theme = _load_saved_theme()
 	set_theme(initial_theme, false)
 
 func get_current_theme() -> String:
 	return _current_theme
+
+func get_environment_mode() -> String:
+	return _current_env_mode
+
+func set_environment_mode(mode: String, save: bool = true) -> void:
+	if mode != "dark" and mode != "light":
+		mode = "dark"
+	_current_env_mode = mode
+	if save:
+		_save_env_mode(mode)
+	print("[ThemeManager] Environment mode set to: ", mode)
+	environment_mode_changed.emit(mode)
+
+func toggle_environment_mode() -> void:
+	var next_mode = "light" if _current_env_mode == "dark" else "dark"
+	set_environment_mode(next_mode)
 
 func get_theme_list() -> Array[Dictionary]:
 	var list: Array[Dictionary] = []
@@ -96,10 +115,13 @@ func _load_saved_theme() -> String:
 	else:
 		var cfg = ConfigFile.new()
 		if cfg.load("user://settings.cfg") == OK:
-			var val = cfg.get_value("theme", "current", "wood")
+			var val = cfg.get_value("theme", "current", "")
 			if str(val) in THEME_IDS:
 				return str(val)
-	return "wood"
+
+	# Randomize on first visit!
+	randomize()
+	return THEME_IDS[randi() % THEME_IDS.size()]
 
 func _save_theme(theme_id: String) -> void:
 	if OS.has_feature("web"):
@@ -107,6 +129,27 @@ func _save_theme(theme_id: String) -> void:
 	else:
 		var cfg = ConfigFile.new()
 		cfg.set_value("theme", "current", theme_id)
+		cfg.save("user://settings.cfg")
+
+func _load_saved_env_mode() -> String:
+	if OS.has_feature("web"):
+		var val = JavaScriptBridge.eval("(function(){ try { return localStorage.getItem('chk_godot_env_mode') || ''; } catch(e){ return ''; } })()")
+		if val != null and (str(val) == "dark" or str(val) == "light"):
+			return str(val)
+	else:
+		var cfg = ConfigFile.new()
+		if cfg.load("user://settings.cfg") == OK:
+			var val = cfg.get_value("theme", "env_mode", "dark")
+			if str(val) == "dark" or str(val) == "light":
+				return str(val)
+	return "dark"
+
+func _save_env_mode(mode: String) -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("try { localStorage.setItem('chk_godot_env_mode', '" + mode + "'); if(document.body){ document.body.classList.toggle('light-mode', '" + mode + "' === 'light'); } } catch(e){}")
+	else:
+		var cfg = ConfigFile.new()
+		cfg.set_value("theme", "env_mode", mode)
 		cfg.save("user://settings.cfg")
 
 func _init_all_materials() -> void:

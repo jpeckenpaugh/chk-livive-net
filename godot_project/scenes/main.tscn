@@ -34,6 +34,17 @@ albedo_color = Color(0.08, 0.08, 0.09, 1)
 metallic = 0.2
 roughness = 0.5
 
+[sub_resource type="CylinderMesh" id="CylinderMesh_floor"]
+top_radius = 28.0
+bottom_radius = 28.0
+height = 0.04
+radial_segments = 48
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor"]
+albedo_color = Color(0.06, 0.06, 0.08, 1)
+roughness = 0.65
+metallic = 0.1
+
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
 
@@ -45,6 +56,17 @@ transform = Transform3D(0.866025, -0.383022, 0.321394, 0, 0.642788, 0.766044, -0
 light_color = Color(1, 0.96, 0.9, 1)
 light_energy = 1.05
 shadow_enabled = true
+
+[node name="RimLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.707107, 0.353553, -0.612372, 0, 0.866025, 0.5, 0.707107, 0.353553, -0.612372, 5, 8, 6)
+light_color = Color(0.65, 0.75, 0.95, 1)
+light_energy = 0.45
+shadow_enabled = false
+
+[node name="StudioFloor" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.42, 0)
+mesh = SubResource("CylinderMesh_floor")
+surface_material_override/0 = SubResource("StandardMaterial3D_floor")
 
 [node name="CameraPivot" type="Node3D" parent="."]
 

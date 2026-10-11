@@ -6,6 +6,7 @@ extends Control
 
 @onready var btn_close: Button = $Backdrop/Dialog/Margin/VBox/Header/BtnClose
 @onready var btn_done: Button = $Backdrop/Dialog/Margin/VBox/Footer/BtnDone
+@onready var btn_env_toggle: Button = $Backdrop/Dialog/Margin/VBox/Footer/EnvContainer/BtnEnvToggle
 
 # Theme Cards
 @onready var card_wood: PanelContainer = $Backdrop/Dialog/Margin/VBox/ThemeList/CardWood
@@ -28,6 +29,8 @@ func _ready() -> void:
 		btn_close.pressed.connect(func(): visible = false)
 	if btn_done:
 		btn_done.pressed.connect(func(): visible = false)
+	if btn_env_toggle:
+		btn_env_toggle.pressed.connect(_on_btn_env_toggle_pressed)
 
 	if btn_wood:
 		btn_wood.pressed.connect(func(): _select_theme("wood"))
@@ -42,16 +45,34 @@ func _ready() -> void:
 
 	if ThemeManager != null:
 		ThemeManager.theme_changed.connect(_on_theme_changed)
+		ThemeManager.environment_mode_changed.connect(_on_env_mode_changed)
 		_update_active_ui(ThemeManager.get_current_theme())
+		_update_env_toggle_ui(ThemeManager.get_environment_mode())
 
 func _exit_tree() -> void:
-	if ThemeManager != null and ThemeManager.theme_changed.is_connected(_on_theme_changed):
-		ThemeManager.theme_changed.disconnect(_on_theme_changed)
+	if ThemeManager != null:
+		if ThemeManager.theme_changed.is_connected(_on_theme_changed):
+			ThemeManager.theme_changed.disconnect(_on_theme_changed)
+		if ThemeManager.environment_mode_changed.is_connected(_on_env_mode_changed):
+			ThemeManager.environment_mode_changed.disconnect(_on_env_mode_changed)
 
 func open() -> void:
 	if ThemeManager != null:
 		_update_active_ui(ThemeManager.get_current_theme())
+		_update_env_toggle_ui(ThemeManager.get_environment_mode())
 	visible = true
+
+func _on_btn_env_toggle_pressed() -> void:
+	if ThemeManager != null:
+		ThemeManager.toggle_environment_mode()
+
+func _on_env_mode_changed(mode: String) -> void:
+	_update_env_toggle_ui(mode)
+
+func _update_env_toggle_ui(mode: String) -> void:
+	if btn_env_toggle != null:
+		btn_env_toggle.text = "Dark Mode" if mode == "dark" else "Light Mode"
+
 
 func _select_theme(theme_id: String) -> void:
 	if ThemeManager != null:

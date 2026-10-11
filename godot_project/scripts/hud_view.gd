@@ -43,6 +43,7 @@ signal reopen_game_over_requested
 @onready var btn_notation: Button = $Toolbar/Margin/HBox/BtnNotation
 @onready var btn_mute: Button = $Toolbar/Margin/HBox/BtnMute
 @onready var btn_theme: Button = $Toolbar/Margin/HBox/BtnTheme
+@onready var btn_env_mode: Button = $Toolbar/Margin/HBox/BtnEnvMode
 @onready var btn_reset: Button = $Toolbar/Margin/HBox/BtnReset
 @onready var btn_menu: Button = $Toolbar/Margin/HBox/BtnMenu
 @onready var btn_recap: Button = $Toolbar/Margin/HBox/BtnRecap
@@ -81,7 +82,9 @@ func _ready() -> void:
 	# Connect theme manager signals
 	if ThemeManager != null:
 		ThemeManager.theme_changed.connect(_on_theme_changed)
+		ThemeManager.environment_mode_changed.connect(_on_env_mode_changed)
 		_apply_theme_styling()
+		_update_env_mode_button_text(ThemeManager.get_environment_mode())
 
 	# Connect button clicks
 	if btn_flip:
@@ -92,6 +95,8 @@ func _ready() -> void:
 		btn_mute.pressed.connect(_on_btn_mute_pressed)
 	if btn_theme:
 		btn_theme.pressed.connect(_on_btn_theme_pressed)
+	if btn_env_mode:
+		btn_env_mode.pressed.connect(_on_btn_env_mode_pressed)
 	if btn_reset:
 		btn_reset.pressed.connect(_on_btn_reset_pressed)
 	if btn_menu:
@@ -284,6 +289,9 @@ func _clean_display_text(raw_text: String) -> String:
 func _on_player_info_updated(color: int, info: Dictionary) -> void:
 	var raw_name: String = info.get("name", "")
 	var raw_avatar: String = info.get("avatar", "")
+	var badge_text_payload: String = info.get("badgeText", "")
+	var badge_bg_hex: String = info.get("badgeBg", "")
+	var badge_border_hex: String = info.get("badgeBorder", "")
 	var clean_name: String = _clean_display_text(raw_name)
 
 	var is_red: bool = (color == 1)
@@ -295,9 +303,9 @@ func _on_player_info_updated(color: int, info: Dictionary) -> void:
 		name_label.text = clean_name
 
 	if badge != null and badge_label != null:
-		_configure_avatar_badge(badge, badge_label, raw_name, raw_avatar, is_red)
+		_configure_avatar_badge(badge, badge_label, raw_name, raw_avatar, is_red, badge_text_payload, badge_bg_hex, badge_border_hex)
 
-func _configure_avatar_badge(badge: PanelContainer, label: Label, pname: String, avatar: String, is_red: bool) -> void:
+func _configure_avatar_badge(badge: PanelContainer, label: Label, pname: String, avatar: String, is_red: bool, badge_text_payload: String = "", badge_bg_hex: String = "", badge_border_hex: String = "") -> void:
 	var st = badge.get_theme_stylebox("panel") as StyleBoxFlat
 	if st == null:
 		st = StyleBoxFlat.new()
@@ -308,37 +316,45 @@ func _configure_avatar_badge(badge: PanelContainer, label: Label, pname: String,
 	var border_color: Color = Color(1.0, 0.4, 0.35) if is_red else Color(0.7, 0.75, 0.8)
 	var is_pill: bool = false
 
-	# Detect persona from name or raw avatar string
-	if avatar.contains("🧐") or pname.containsn("Worthington"):
-		badge_text = "LORD"
-		bg_color = Color(0.25, 0.15, 0.35)
-		border_color = Color(0.8, 0.65, 0.3)
-		is_pill = true
-	elif avatar.contains("🏴‍☠️") or pname.containsn("Redbeard") or pname.containsn("Pirate"):
-		badge_text = "PIRATE"
-		bg_color = Color(0.45, 0.12, 0.12)
-		border_color = Color(0.9, 0.3, 0.25)
-		is_pill = true
-	elif avatar.contains("🤖") or pname.containsn("Unit 734") or pname.containsn("Robot"):
-		badge_text = "ROBOT"
-		bg_color = Color(0.08, 0.25, 0.32)
-		border_color = Color(0.0, 0.94, 1.0)
-		is_pill = true
-	elif avatar.contains("⚡") or pname.containsn("Kenji"):
-		badge_text = "KENJI"
-		bg_color = Color(0.12, 0.28, 0.45)
-		border_color = Color(0.35, 0.75, 0.95)
-		is_pill = true
-	elif avatar.contains("👵") or pname.containsn("Granny"):
-		badge_text = "GRANNY"
-		bg_color = Color(0.45, 0.2, 0.35)
-		border_color = Color(0.9, 0.6, 0.7)
-		is_pill = true
-	elif avatar.contains("⚙") or pname.containsn("Minimax") or pname.containsn("CPU"):
-		badge_text = "CPU"
-		bg_color = Color(0.18, 0.22, 0.28)
-		border_color = Color(0.45, 0.65, 0.85)
-		is_pill = true
+	if badge_text_payload != "":
+		badge_text = badge_text_payload
+		is_pill = (badge_text.length() > 1)
+		if badge_bg_hex != "":
+			bg_color = Color.from_string(badge_bg_hex, bg_color)
+		if badge_border_hex != "":
+			border_color = Color.from_string(badge_border_hex, border_color)
+	else:
+		# Detect persona from name or raw avatar string fallback
+		if avatar.contains("🧐") or pname.containsn("Worthington"):
+			badge_text = "LORD"
+			bg_color = Color(0.25, 0.15, 0.35)
+			border_color = Color(0.8, 0.65, 0.3)
+			is_pill = true
+		elif avatar.contains("🏴‍☠️") or pname.containsn("Redbeard") or pname.containsn("Pirate"):
+			badge_text = "PIRATE"
+			bg_color = Color(0.45, 0.12, 0.12)
+			border_color = Color(0.9, 0.3, 0.25)
+			is_pill = true
+		elif avatar.contains("🤖") or pname.containsn("Unit 734") or pname.containsn("Robot"):
+			badge_text = "ROBOT"
+			bg_color = Color(0.08, 0.25, 0.32)
+			border_color = Color(0.0, 0.94, 1.0)
+			is_pill = true
+		elif avatar.contains("⚡") or pname.containsn("Kenji"):
+			badge_text = "KENJI"
+			bg_color = Color(0.12, 0.28, 0.45)
+			border_color = Color(0.35, 0.75, 0.95)
+			is_pill = true
+		elif avatar.contains("👵") or pname.containsn("Granny"):
+			badge_text = "GRANNY"
+			bg_color = Color(0.45, 0.2, 0.35)
+			border_color = Color(0.9, 0.6, 0.7)
+			is_pill = true
+		elif avatar.contains("⚙") or pname.containsn("Minimax") or pname.containsn("CPU"):
+			badge_text = "CPU"
+			bg_color = Color(0.18, 0.22, 0.28)
+			border_color = Color(0.45, 0.65, 0.85)
+			is_pill = true
 
 	label.text = badge_text
 	st.bg_color = bg_color
@@ -432,3 +448,14 @@ func _on_board_flipped(flipped: bool) -> void:
 
 func _on_show_notation_changed(show: bool) -> void:
 	_show_notation = show
+
+func _on_btn_env_mode_pressed() -> void:
+	if ThemeManager != null:
+		ThemeManager.toggle_environment_mode()
+
+func _on_env_mode_changed(mode: String) -> void:
+	_update_env_mode_button_text(mode)
+
+func _update_env_mode_button_text(mode: String) -> void:
+	if btn_env_mode != null:
+		btn_env_mode.text = "Dark" if mode == "dark" else "Light"

@@ -4,6 +4,8 @@ extends Control
 ## Controller for the Game Mode Selection modal dialog.
 ## Supports Pass & Play, vs Minimax AI, vs WebLLM AI, Spectator Arena,
 ## and live Theme selection across Wood, Marble, Glass, Metal, and Cyber.
+## Fully supports categorized 30-persona selection, expanded Spectator matchups,
+## and dynamic initial load and on-demand randomization.
 
 signal match_launched(config: Dictionary)
 
@@ -27,20 +29,24 @@ signal match_launched(config: Dictionary)
 @onready var btn_mm_color_black: Button = $Backdrop/Dialog/Margin/VBox/ContentPanels/PanelMinimax/ColorHBox/BtnBlack
 
 # LLM Controls
+@onready var category_option: OptionButton = $Backdrop/Dialog/Margin/VBox/ContentPanels/PanelLLM/CategoryHBox/CategoryOption
 @onready var persona_option: OptionButton = $Backdrop/Dialog/Margin/VBox/ContentPanels/PanelLLM/PersonaHBox/PersonaOption
 @onready var model_option: OptionButton = $Backdrop/Dialog/Margin/VBox/ContentPanels/PanelLLM/ModelHBox/ModelOption
 @onready var btn_llm_color_red: Button = $Backdrop/Dialog/Margin/VBox/ContentPanels/PanelLLM/ColorHBox/BtnRed
 @onready var btn_llm_color_black: Button = $Backdrop/Dialog/Margin/VBox/ContentPanels/PanelLLM/ColorHBox/BtnBlack
 
 # Arena Controls
-@onready var arena_red_type: OptionButton = $Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena/RedHBox/RedTypeOption
-@onready var arena_black_type: OptionButton = $Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena/BlackHBox/BlackTypeOption
+@onready var arena_red_category: OptionButton = $Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena/RedHBox/RedCategoryOption
+@onready var arena_red_selection: OptionButton = $Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena/RedHBox/RedSelectionOption
+@onready var arena_black_category: OptionButton = $Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena/BlackHBox/BlackCategoryOption
+@onready var arena_black_selection: OptionButton = $Backdrop/Dialog/Margin/VBox/ContentPanels/PanelArena/BlackHBox/BlackSelectionOption
 
 # Theme Selector
 @onready var theme_option: OptionButton = $Backdrop/Dialog/Margin/VBox/ThemeHBox/ThemeOption
 
 # Action Buttons
 @onready var btn_start: Button = $Backdrop/Dialog/Margin/VBox/Actions/BtnStart
+@onready var btn_randomize: Button = $Backdrop/Dialog/Margin/VBox/Header/BtnRandomize
 @onready var btn_close: Button = $Backdrop/Dialog/Margin/VBox/Header/BtnClose
 
 # Selected state values
@@ -48,16 +54,64 @@ var _selected_mode: String = "minimax"
 var _minimax_diff: String = "medium"
 var _minimax_color: String = "red"
 var _llm_color: String = "red"
-var _llm_persona: String = "victorian"
 var _llm_model: String = "Llama-3.2-1B-Instruct-q4f16_1-MLC"
 
-# Clean persona list without emoji glyph issues
-const PERSONAS = [
-	{ "id": "victorian", "label": "Lord Worthington (Victorian)" },
-	{ "id": "pirate", "label": "Captain Redbeard (Pirate)" },
-	{ "id": "cyber", "label": "Unit 734 (Robot Core)" },
-	{ "id": "anime", "label": "Kenji Kurogane (Anime Rival)" },
-	{ "id": "grandma", "label": "Granny Edna (Warm Baker)" }
+# Categorized Persona Roster (30 total personas, 10 per category)
+const CATEGORIES = [
+	{ "id": "standard", "label": "Standard" },
+	{ "id": "cybernetic", "label": "Cybernetic" },
+	{ "id": "creative", "label": "Creative" }
+]
+
+const ALL_PERSONAS = [
+	# Standard (10)
+	{ "id": "grandmaster", "category": "standard", "label": "Boris Volkov (Grandmaster)" },
+	{ "id": "casual", "category": "standard", "label": "Sammy Davis (Coffee-Shop)" },
+	{ "id": "tactician", "category": "standard", "label": "Valeria Cruz (Tactician)" },
+	{ "id": "coach", "category": "standard", "label": "Coach Dan (Strategist)" },
+	{ "id": "grandma", "category": "standard", "label": "Granny Edna (Baker)" },
+	{ "id": "napoleon", "category": "standard", "label": "Emperor Bonaparte (Conqueror)" },
+	{ "id": "cleopatra", "category": "standard", "label": "Queen Cleopatra (Pharaoh)" },
+	{ "id": "franklin", "category": "standard", "label": "Ben Franklin (Statesman)" },
+	{ "id": "joan", "category": "standard", "label": "Joan of Arc (Vanguard)" },
+	{ "id": "monk", "category": "standard", "label": "Master Tenzin (Zen Sage)" },
+
+	# Cybernetic (10)
+	{ "id": "cyber", "category": "cybernetic", "label": "Unit 734 (Logic Core)" },
+	{ "id": "roomba", "category": "cybernetic", "label": "DustBuster 3000 (Vacuum)" },
+	{ "id": "smart_fridge", "category": "cybernetic", "label": "ChillMaster 9000 (Fridge)" },
+	{ "id": "glitch_phone", "category": "cybernetic", "label": "PocketDroid 4G (Phone)" },
+	{ "id": "tamagotchi", "category": "cybernetic", "label": "PixelPet 96 (Virtual Pet)" },
+	{ "id": "dialup", "category": "cybernetic", "label": "BaudRate 56k (Modem)" },
+	{ "id": "glitched_npc", "category": "cybernetic", "label": "Error_404_NPC (Glitched NPC)" },
+	{ "id": "arcade", "category": "cybernetic", "label": "CoinOp 1984 (Arcade)" },
+	{ "id": "quantum_ai", "category": "cybernetic", "label": "Q-Bit Prime (Quantum AI)" },
+	{ "id": "assistant", "category": "cybernetic", "label": "Clippy Assistant (Helper)" },
+
+	# Creative (10)
+	{ "id": "pirate", "category": "creative", "label": "Captain Redbeard (Pirate)" },
+	{ "id": "victorian", "category": "creative", "label": "Lord Worthington (Victorian)" },
+	{ "id": "anime", "category": "creative", "label": "Kenji Kurogane (Anime Rival)" },
+	{ "id": "soap_opera", "category": "creative", "label": "Valentina Sterling (Diva)" },
+	{ "id": "conspiracy", "category": "creative", "label": "Agent Truth (Investigator)" },
+	{ "id": "noir", "category": "creative", "label": "Detective Vance (Private Eye)" },
+	{ "id": "bard", "category": "creative", "label": "Master Jeffrey (Minstrel)" },
+	{ "id": "goblin", "category": "creative", "label": "Grix the Greedy (Goblin)" },
+	{ "id": "chef", "category": "creative", "label": "Chef Pierre (French Chef)" },
+	{ "id": "thespian", "category": "creative", "label": "Sir Reginald Acton (Thespian)" }
+]
+
+const ARENA_CATEGORIES = [
+	{ "id": "minimax", "label": "Minimax AI" },
+	{ "id": "standard", "label": "Standard AI" },
+	{ "id": "cybernetic", "label": "Cybernetic AI" },
+	{ "id": "creative", "label": "Creative AI" }
+]
+
+const MINIMAX_DIFFICULTIES = [
+	{ "id": "easy", "label": "Easy" },
+	{ "id": "medium", "label": "Medium" },
+	{ "id": "hard", "label": "Hard" }
 ]
 
 const MODELS = [
@@ -86,40 +140,123 @@ func _ready() -> void:
 		ThemeManager.theme_changed.connect(_on_theme_changed)
 		_sync_theme_selection(ThemeManager.get_current_theme())
 
+	# Initial load dynamic randomization
+	_randomize_defaults()
+
 func _exit_tree() -> void:
 	if ThemeManager != null and ThemeManager.theme_changed.is_connected(_on_theme_changed):
 		ThemeManager.theme_changed.disconnect(_on_theme_changed)
 
-func _setup_options() -> void:
-	if persona_option:
-		persona_option.clear()
-		for p in PERSONAS:
-			persona_option.add_item(p.label)
-		persona_option.selected = 0
+func _get_personas_by_category(cat_id: String) -> Array:
+	var result: Array = []
+	for p in ALL_PERSONAS:
+		if p.category == cat_id:
+			result.append(p)
+	return result
 
+func _setup_options() -> void:
+	# Category Option for LLM
+	if category_option:
+		category_option.clear()
+		for cat in CATEGORIES:
+			category_option.add_item(cat.label)
+		category_option.item_selected.connect(_on_llm_category_selected)
+		category_option.selected = 0
+		_populate_llm_personas("standard")
+
+	# Model Option for LLM
 	if model_option:
 		model_option.clear()
 		for m in MODELS:
 			model_option.add_item(m.label)
 		model_option.selected = 0
 
-	if arena_red_type:
-		arena_red_type.clear()
-		arena_red_type.add_item("Captain Redbeard (LLM)")
-		arena_red_type.add_item("Minimax Medium")
-		arena_red_type.selected = 0
+	# Spectator Arena Categories & Dropdowns
+	_setup_arena_options()
 
-	if arena_black_type:
-		arena_black_type.clear()
-		arena_black_type.add_item("Lord Worthington (LLM)")
-		arena_black_type.add_item("Minimax Medium")
-		arena_black_type.selected = 0
-
+	# Theme Selector
 	if theme_option:
 		theme_option.clear()
 		for opt in THEME_OPTIONS:
 			theme_option.add_item(opt.label)
 		theme_option.item_selected.connect(_on_theme_option_selected)
+
+func _on_llm_category_selected(index: int) -> void:
+	if index >= 0 and index < CATEGORIES.size():
+		var cat_id = CATEGORIES[index].id
+		_populate_llm_personas(cat_id)
+
+func _populate_llm_personas(cat_id: String, select_persona_id: String = "") -> void:
+	if persona_option == null:
+		return
+	persona_option.clear()
+	var list = _get_personas_by_category(cat_id)
+	var selected_idx = 0
+	for i in range(list.size()):
+		persona_option.add_item(list[i].label)
+		if list[i].id == select_persona_id:
+			selected_idx = i
+	persona_option.selected = selected_idx
+
+func _setup_arena_options() -> void:
+	if arena_red_category:
+		arena_red_category.clear()
+		for cat in ARENA_CATEGORIES:
+			arena_red_category.add_item(cat.label)
+		arena_red_category.item_selected.connect(_on_arena_red_category_selected)
+		arena_red_category.selected = 3 # Creative AI by default
+
+	if arena_red_selection:
+		_populate_arena_selection(arena_red_selection, "creative", "pirate")
+
+	if arena_black_category:
+		arena_black_category.clear()
+		for cat in ARENA_CATEGORIES:
+			arena_black_category.add_item(cat.label)
+		arena_black_category.item_selected.connect(_on_arena_black_category_selected)
+		arena_black_category.selected = 3 # Creative AI by default
+
+	if arena_black_selection:
+		_populate_arena_selection(arena_black_selection, "creative", "victorian")
+
+func _on_arena_red_category_selected(index: int) -> void:
+	if index >= 0 and index < ARENA_CATEGORIES.size():
+		_populate_arena_selection(arena_red_selection, ARENA_CATEGORIES[index].id)
+
+func _on_arena_black_category_selected(index: int) -> void:
+	if index >= 0 and index < ARENA_CATEGORIES.size():
+		_populate_arena_selection(arena_black_selection, ARENA_CATEGORIES[index].id)
+
+func _populate_arena_selection(target_option: OptionButton, cat_id: String, select_id: String = "") -> void:
+	if target_option == null:
+		return
+	target_option.clear()
+	var selected_idx = 0
+	if cat_id == "minimax":
+		for i in range(MINIMAX_DIFFICULTIES.size()):
+			target_option.add_item(MINIMAX_DIFFICULTIES[i].label)
+			if MINIMAX_DIFFICULTIES[i].id == select_id:
+				selected_idx = i
+	else:
+		var list = _get_personas_by_category(cat_id)
+		for i in range(list.size()):
+			target_option.add_item(list[i].label)
+			if list[i].id == select_id:
+				selected_idx = i
+	target_option.selected = selected_idx
+
+func _get_arena_slot_config(cat_option: OptionButton, sel_option: OptionButton) -> Dictionary:
+	var cat_idx: int = cat_option.selected if cat_option else 0
+	var cat_id: String = ARENA_CATEGORIES[cat_idx].id if cat_idx < ARENA_CATEGORIES.size() else "minimax"
+	var sel_idx: int = sel_option.selected if sel_option else 0
+
+	if cat_id == "minimax":
+		var diff = MINIMAX_DIFFICULTIES[sel_idx].id if sel_idx < MINIMAX_DIFFICULTIES.size() else "medium"
+		return { "type": "minimax", "persona": "", "difficulty": diff }
+	else:
+		var list = _get_personas_by_category(cat_id)
+		var persona_id = list[sel_idx].id if sel_idx < list.size() else "pirate"
+		return { "type": "llm", "persona": persona_id, "difficulty": "medium" }
 
 func _on_theme_option_selected(index: int) -> void:
 	if index >= 0 and index < THEME_OPTIONS.size():
@@ -172,8 +309,65 @@ func _bind_events() -> void:
 	# Actions
 	if btn_start:
 		btn_start.pressed.connect(_on_btn_start_pressed)
+	if btn_randomize:
+		btn_randomize.pressed.connect(_on_btn_randomize_pressed)
 	if btn_close:
 		btn_close.pressed.connect(func(): visible = false)
+
+func _on_btn_randomize_pressed() -> void:
+	_randomize_defaults()
+
+func _randomize_defaults() -> void:
+	# 1. Randomize Board Theme
+	var rand_theme_idx: int = randi() % THEME_OPTIONS.size()
+	var rand_theme_id: String = THEME_OPTIONS[rand_theme_idx].id
+	if ThemeManager != null:
+		ThemeManager.set_theme(rand_theme_id)
+	if theme_option != null:
+		theme_option.selected = rand_theme_idx
+
+	# 2. Randomize LLM Category & Persona
+	var rand_cat_idx: int = randi() % CATEGORIES.size()
+	if category_option != null:
+		category_option.selected = rand_cat_idx
+	var cat_id: String = CATEGORIES[rand_cat_idx].id
+	var personas_in_cat: Array = _get_personas_by_category(cat_id)
+	var rand_p_idx: int = randi() % personas_in_cat.size()
+	_populate_llm_personas(cat_id, personas_in_cat[rand_p_idx].id)
+
+	# 3. Randomize Spectator Red & Black Matchup
+	# Pick Red: either Minimax or one of the AI categories
+	var red_cat_idx: int = randi() % ARENA_CATEGORIES.size()
+	var red_cat_id: String = ARENA_CATEGORIES[red_cat_idx].id
+	if arena_red_category != null:
+		arena_red_category.selected = red_cat_idx
+
+	var red_chosen_id: String = ""
+	if red_cat_id == "minimax":
+		var diff_idx = randi() % MINIMAX_DIFFICULTIES.size()
+		red_chosen_id = MINIMAX_DIFFICULTIES[diff_idx].id
+		_populate_arena_selection(arena_red_selection, red_cat_id, red_chosen_id)
+	else:
+		var red_list = _get_personas_by_category(red_cat_id)
+		var p_idx = randi() % red_list.size()
+		red_chosen_id = red_list[p_idx].id
+		_populate_arena_selection(arena_red_selection, red_cat_id, red_chosen_id)
+
+	# Pick Black: ensure it isn't identical to Red
+	var black_cat_idx: int = randi() % ARENA_CATEGORIES.size()
+	var black_cat_id: String = ARENA_CATEGORIES[black_cat_idx].id
+	if arena_black_category != null:
+		arena_black_category.selected = black_cat_idx
+
+	if black_cat_id == "minimax":
+		var diff_idx = randi() % MINIMAX_DIFFICULTIES.size()
+		_populate_arena_selection(arena_black_selection, black_cat_id, MINIMAX_DIFFICULTIES[diff_idx].id)
+	else:
+		var black_list = _get_personas_by_category(black_cat_id)
+		var b_idx = randi() % black_list.size()
+		if black_list[b_idx].id == red_chosen_id and black_list.size() > 1:
+			b_idx = (b_idx + 1) % black_list.size()
+		_populate_arena_selection(arena_black_selection, black_cat_id, black_list[b_idx].id)
 
 func _update_tab_selection(mode: String) -> void:
 	_selected_mode = mode
@@ -228,8 +422,11 @@ func _on_btn_start_pressed() -> void:
 			"minimaxColor": _minimax_color
 		}
 	elif _selected_mode == "llm":
+		var cat_idx: int = category_option.selected if category_option else 0
+		var cat_id: String = CATEGORIES[cat_idx].id if cat_idx < CATEGORIES.size() else "standard"
+		var personas: Array = _get_personas_by_category(cat_id)
 		var p_idx: int = persona_option.selected if persona_option else 0
-		var selected_persona: String = PERSONAS[p_idx].id if p_idx < PERSONAS.size() else "victorian"
+		var selected_persona: String = personas[p_idx].id if p_idx < personas.size() else "victorian"
 		var m_idx: int = model_option.selected if model_option else 0
 		var selected_model: String = MODELS[m_idx].id if m_idx < MODELS.size() else "Llama-3.2-1B-Instruct-q4f16_1-MLC"
 
@@ -241,15 +438,17 @@ func _on_btn_start_pressed() -> void:
 			"tacticalMode": "wild"
 		}
 	elif _selected_mode == "arena":
-		var red_is_llm: bool = (arena_red_type.selected == 0) if arena_red_type else true
-		var black_is_llm: bool = (arena_black_type.selected == 0) if arena_black_type else true
+		var red_cfg = _get_arena_slot_config(arena_red_category, arena_red_selection)
+		var black_cfg = _get_arena_slot_config(arena_black_category, arena_black_selection)
 
 		config = {
 			"mode": "arena",
-			"arenaRedType": "llm" if red_is_llm else "minimax",
-			"arenaRedPersona": "pirate",
-			"arenaBlackType": "llm" if black_is_llm else "minimax",
-			"arenaBlackPersona": "victorian",
+			"arenaRedType": red_cfg.type,
+			"arenaRedPersona": red_cfg.persona,
+			"arenaRedDifficulty": red_cfg.difficulty,
+			"arenaBlackType": black_cfg.type,
+			"arenaBlackPersona": black_cfg.persona,
+			"arenaBlackDifficulty": black_cfg.difficulty,
 			"modelId": "Llama-3.2-1B-Instruct-q4f16_1-MLC"
 		}
 
