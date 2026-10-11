@@ -36,13 +36,21 @@ func _ready() -> void:
 		_setup_mock_mode()
 
 func _setup_web_bridge() -> void:
-	_js_bridge = JavaScriptBridge.eval("window.GodotCheckersBridge")
-	if _js_bridge == null:
+	var is_ready = JavaScriptBridge.eval("Boolean(window.GodotCheckersBridge)")
+	if not is_ready:
 		print("[Bridge] Waiting for window.GodotCheckersBridge to initialize...")
 		var t = get_tree().create_timer(0.05)
 		t.timeout.connect(_setup_web_bridge)
 		return
 
+	var win = JavaScriptBridge.get_interface("window")
+	if win == null or win.GodotCheckersBridge == null:
+		print("[Bridge] Waiting for window.GodotCheckersBridge property...")
+		var t = get_tree().create_timer(0.05)
+		t.timeout.connect(_setup_web_bridge)
+		return
+
+	_js_bridge = win.GodotCheckersBridge
 	print("[Bridge] Web client connected to JavaScript bridge. Registering callbacks...")
 
 	# Create persistent callbacks
@@ -178,18 +186,14 @@ func notify_square_clicked(index: int) -> void:
 	if is_mock_mode:
 		print("[Bridge Mock] Square clicked: ", index)
 		return
-
-	if _js_bridge and _js_bridge.has("onSquareClicked") and _js_bridge["onSquareClicked"] != null:
-		_js_bridge.onSquareClicked(index)
+	JavaScriptBridge.eval("if (window.GodotCheckersBridge && window.GodotCheckersBridge.onSquareClicked) window.GodotCheckersBridge.onSquareClicked(" + str(index) + ");")
 
 ## Notifies JS controller that piece move/hop animation has concluded
 func notify_animation_complete() -> void:
 	if is_mock_mode:
 		print("[Bridge Mock] Move animation complete.")
 		return
-
-	if _js_bridge and _js_bridge.has("onAnimationComplete") and _js_bridge["onAnimationComplete"] != null:
-		_js_bridge.onAnimationComplete()
+	JavaScriptBridge.eval("if (window.GodotCheckersBridge && window.GodotCheckersBridge.onAnimationComplete) window.GodotCheckersBridge.onAnimationComplete();")
 
 ## Requests JS controller to launch match with configuration
 func notify_launch_match(config: Dictionary) -> void:
@@ -197,9 +201,7 @@ func notify_launch_match(config: Dictionary) -> void:
 	if is_mock_mode:
 		print("[Bridge Mock] Launch match requested: ", json_str)
 		return
-
-	if _js_bridge and _js_bridge.has("onLaunchMatch") and _js_bridge["onLaunchMatch"] != null:
-		_js_bridge.onLaunchMatch(json_str)
+	JavaScriptBridge.eval("if (window.GodotCheckersBridge && window.GodotCheckersBridge.onLaunchMatch) window.GodotCheckersBridge.onLaunchMatch(" + JSON.stringify(json_str) + ");")
 
 ## Requests JS controller to reset the current game
 func notify_reset_game() -> void:
@@ -207,18 +209,15 @@ func notify_reset_game() -> void:
 		print("[Bridge Mock] Reset game requested.")
 		_emit_mock_initial_state()
 		return
-
-	if _js_bridge and _js_bridge.has("onResetGame") and _js_bridge["onResetGame"] != null:
-		_js_bridge.onResetGame()
+	JavaScriptBridge.eval("if (window.GodotCheckersBridge && window.GodotCheckersBridge.onResetGame) window.GodotCheckersBridge.onResetGame();")
 
 ## Notifies JS spectator controls (e.g. "play", "pause", "step", "speed")
 func notify_spectator_action(action: String, value: Variant = null) -> void:
 	if is_mock_mode:
 		print("[Bridge Mock] Spectator action: ", action, " value: ", value)
 		return
-
-	if _js_bridge and _js_bridge.has("onSpectatorAction") and _js_bridge["onSpectatorAction"] != null:
-		_js_bridge.onSpectatorAction(action, value)
+	var val_str: String = JSON.stringify(value) if value != null else "null"
+	JavaScriptBridge.eval("if (window.GodotCheckersBridge && window.GodotCheckersBridge.onSpectatorAction) window.GodotCheckersBridge.onSpectatorAction(" + JSON.stringify(action) + ", " + val_str + ");")
 
 ## Notifies board flip toggle
 func notify_board_flipped(flipped: bool) -> void:
@@ -226,9 +225,7 @@ func notify_board_flipped(flipped: bool) -> void:
 	if is_mock_mode:
 		print("[Bridge Mock] Board flipped: ", flipped)
 		return
-
-	if _js_bridge and _js_bridge.has("onBoardFlipped") and _js_bridge["onBoardFlipped"] != null:
-		_js_bridge.onBoardFlipped(flipped)
+	JavaScriptBridge.eval("if (window.GodotCheckersBridge && window.GodotCheckersBridge.onBoardFlipped) window.GodotCheckersBridge.onBoardFlipped(" + ("true" if flipped else "false") + ");")
 
 ## Notifies notation numbers toggle
 func notify_show_notation(show: bool) -> void:
@@ -236,15 +233,11 @@ func notify_show_notation(show: bool) -> void:
 	if is_mock_mode:
 		print("[Bridge Mock] Show notation: ", show)
 		return
-
-	if _js_bridge and _js_bridge.has("onShowNotation") and _js_bridge["onShowNotation"] != null:
-		_js_bridge.onShowNotation(show)
+	JavaScriptBridge.eval("if (window.GodotCheckersBridge && window.GodotCheckersBridge.onShowNotation) window.GodotCheckersBridge.onShowNotation(" + ("true" if show else "false") + ");")
 
 ## Notifies sound muted toggle
 func notify_muted(muted: bool) -> void:
 	if is_mock_mode:
 		print("[Bridge Mock] Sound muted: ", muted)
 		return
-
-	if _js_bridge and _js_bridge.has("onMuted") and _js_bridge["onMuted"] != null:
-		_js_bridge.onMuted(muted)
+	JavaScriptBridge.eval("if (window.GodotCheckersBridge && window.GodotCheckersBridge.onMuted) window.GodotCheckersBridge.onMuted(" + ("true" if muted else "false") + ");")

@@ -275,6 +275,9 @@
 			}
 			return _nativeFetch.call(this, resource, init);
 		};
+
+		// Pre-initialize window.GodotCheckersBridge so Godot can connect immediately on boot
+		window.GodotCheckersBridge = window.GodotCheckersBridge || {};
 	</script>
 
 	<!-- Godot Engine Loader & Boot Script -->
