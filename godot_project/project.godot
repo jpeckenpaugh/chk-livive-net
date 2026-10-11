@@ -18,6 +18,10 @@ window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
+[autoload]
+
+Bridge="*res://scripts/bridge.gd"
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"

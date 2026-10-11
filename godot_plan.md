@@ -71,7 +71,7 @@ Build an alternate, 3D Web frontend for **English Draughts (Checkers)** using **
   4. Map all lifecycle events:
      - JS ➔ Godot: Initial board state, turn changes, legal move masks, move animation requests, audio cues, and streaming banter tokens.
      - Godot ➔ JS: 3D square click selection, mode selection, spectator controls (play/pause/step/speed), and match restart.
-- **Status:** `[PENDING]`
+- **Status:** `[COMPLETED]`
 
 ### **Section 3: 3D Board, Pieces & Movement Animation Engine**
 - **Goal:** Implement the 3D visual world, materials, interactive raycasting, and animation tweens in Godot.

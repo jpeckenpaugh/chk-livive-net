@@ -372,16 +372,31 @@ const engine = new Engine(GODOT_CONFIG);
 }());
 	</script>
 
-	<!-- ES Module Integration Bridge Stub (Prepared for Section 2+) -->
+	<!-- ES Module Integration Bridge -->
 	<script type="module">
-		// Reserved for JavaScript <-> Godot WebAssembly communication
-		// and rules/controller/WebLLM integration from ../src/
+		import { CheckersController } from '../src/controller.js';
+		import { GodotAdapter } from '../src/godot_adapter.js';
+
+		const adapter = new GodotAdapter();
+		const controller = new CheckersController(adapter);
+
+		window.GodotCheckersBridge.onGodotReady = () => {
+			console.log('[Godot 3D Shell] Godot reported onGodotReady. Initializing CheckersController...');
+			controller.init();
+		};
+
+		window.__checkers = {
+			adapter,
+			controller
+		};
+
 		window.__GODOT_3D_CLIENT__ = {
-			ready: false,
+			ready: true,
 			version: "1.0.0",
 			initializedAt: new Date().toISOString()
 		};
-		console.log('[Godot 3D Shell] ES module bridge interface initialized.');
+
+		console.log('[Godot 3D Shell] ES module bridge interface initialized with CheckersController and GodotAdapter.');
 	</script>
 </body>
 </html>
