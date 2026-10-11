@@ -103,7 +103,7 @@ Build an alternate, 3D Web frontend for **English Draughts (Checkers)** using **
   3. Add `npm run build:godot` scripts to `package.json`.
   4. Update `README.md` to document the 3D Godot client.
   5. Commit clean milestone increments to `main` and push to `origin`.
-- **Status:** `[PENDING]`
+- **Status:** `[COMPLETED]`
 
 ---
 

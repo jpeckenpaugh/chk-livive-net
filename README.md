@@ -206,6 +206,21 @@ Visit `http://localhost:8000` in your browser.
 
 ---
 
+## 🎲 Godot 4 3D Web Edition
+
+An alternate 3D client built with **Godot Engine 4.7 (WebGL2 / Compatibility)** is hosted at `/godot/` (live at [chk.livive.net/godot/](https://chk.livive.net/godot/)).
+
+- **3D PBR Graphics**: Procedural walnut and cream board, beveled dark mahogany frame, red lacquer and black obsidian checker pieces, jump arcs, and capture dissipation effects.
+- **Shared JavaScript Game Engine**: 100% of the game rules, Minimax AI, WebLLM persona banter, and turn state are handled by the tested JS engine (`rules.js`, `controller.js`) via a bidirectional WebAssembly `JavaScriptBridge` contract (`GodotAdapter.js` and `Bridge.gd`).
+- **Hybrid UI**: In-game HUD, turn indicators, Mode Selection modal, Spectator bar, WebLLM preload staging, and 2D banter balloons all rendered seamlessly within Godot.
+- **Headless Build Pipeline**:
+  ```bash
+  npm run build:godot
+  ```
+  Exports the Godot project from `godot_project/` into `/godot/` with automatic SHA-based cache-busting query stamps (`?v=hash`) on `.wasm`, `.pck`, and module dependencies.
+
+---
+
 ## 📜 License
 
 MIT License. See [LICENSE](LICENSE) for details.
