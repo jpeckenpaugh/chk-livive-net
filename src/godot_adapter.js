@@ -279,160 +279,131 @@ export class GodotAdapter {
    */
   _ensureBridge() {
     const root = typeof window !== 'undefined' ? window : globalThis;
-    if (!root.GodotCheckersBridge) {
-      root.GodotCheckersBridge = {
-        // JS -> Godot notifications
-        notifyRender: (json) => {
-          if (root.GodotCheckersBridge._onGodotRender) {
-            try {
-              root.GodotCheckersBridge._onGodotRender(json);
-            } catch (e) {
-              console.error('[GodotAdapter] Error in _onGodotRender:', e);
-            }
-          }
-        },
-        notifyAnimateMove: (json) => {
-          if (root.GodotCheckersBridge._onGodotAnimateMove) {
-            try {
-              root.GodotCheckersBridge._onGodotAnimateMove(json);
-            } catch (e) {
-              console.error('[GodotAdapter] Error in _onGodotAnimateMove:', e);
-            }
-          }
-        },
-        notifyBanterStream: (color, text) => {
-          if (root.GodotCheckersBridge._onGodotBanterStream) {
-            try {
-              root.GodotCheckersBridge._onGodotBanterStream(color, text);
-            } catch (e) {
-              console.error('[GodotAdapter] Error in _onGodotBanterStream:', e);
-            }
-          }
-        },
-        notifyPlayerInfo: (color, json) => {
-          if (root.GodotCheckersBridge._onGodotPlayerInfo) {
-            try {
-              root.GodotCheckersBridge._onGodotPlayerInfo(color, json);
-            } catch (e) {
-              console.error('[GodotAdapter] Error in _onGodotPlayerInfo:', e);
-            }
-          }
-        },
-        notifySpectatorMode: (active, paused) => {
-          if (root.GodotCheckersBridge._onGodotSpectatorMode) {
-            try {
-              root.GodotCheckersBridge._onGodotSpectatorMode(Boolean(active), Boolean(paused));
-            } catch (e) {
-              console.error('[GodotAdapter] Error in _onGodotSpectatorMode:', e);
-            }
-          }
-        },
-        notifyBoardFlipped: (flipped) => {
-          if (root.GodotCheckersBridge._onGodotBoardFlipped) {
-            try {
-              root.GodotCheckersBridge._onGodotBoardFlipped(Boolean(flipped));
-            } catch (e) {
-              console.error('[GodotAdapter] Error in _onGodotBoardFlipped:', e);
-            }
-          }
-        },
-        notifyShowNotation: (show) => {
-          if (root.GodotCheckersBridge._onGodotShowNotation) {
-            try {
-              root.GodotCheckersBridge._onGodotShowNotation(Boolean(show));
-            } catch (e) {
-              console.error('[GodotAdapter] Error in _onGodotShowNotation:', e);
-            }
-          }
-        },
-        notifyDownloadProgress: (json) => {
-          if (root.GodotCheckersBridge._onGodotDownloadProgress) {
-            try {
-              root.GodotCheckersBridge._onGodotDownloadProgress(json);
-            } catch (e) {
-              console.error('[GodotAdapter] Error in _onGodotDownloadProgress:', e);
-            }
-          }
-        },
+    root.GodotCheckersBridge = root.GodotCheckersBridge || {};
+    const b = root.GodotCheckersBridge;
 
-        // Godot -> JS callbacks
-        onGodotReady: () => {
-          this._handleGodotReady();
-        },
-        onSquareClicked: (index) => {
-          this.triggerSquareClick(index);
-        },
-        onAnimationComplete: () => {
-          this._handleAnimationComplete();
-        },
-        onLaunchMatch: (configJson) => {
-          this._handleLaunchMatch(configJson);
-        },
-        onResetGame: () => {
-          this._handleResetGame();
-        },
-        onSpectatorAction: (action, value) => {
-          this._handleSpectatorAction(action, value);
-        },
-        onBoardFlipped: (flipped) => {
-          this.setBoardFlipped(flipped);
-        },
-        onShowNotation: (show) => {
-          this.setShowNotation(show);
-        },
-        onMuted: (muted) => {
-          this.setMuted(muted);
+    // JS -> Godot notifications (ALWAYS attach)
+    b.notifyRender = (json) => {
+      if (b._onGodotRender) {
+        try {
+          b._onGodotRender(json);
+        } catch (e) {
+          console.error('[GodotAdapter] Error in _onGodotRender:', e);
         }
-      };
-    } else {
-      // Ensure bridge callbacks route to this adapter instance
-      const existing = root.GodotCheckersBridge;
-      const prevOnSquareClicked = existing.onSquareClicked;
-      existing.onSquareClicked = (index) => {
-        this.triggerSquareClick(index);
-        if (typeof prevOnSquareClicked === 'function') prevOnSquareClicked(index);
-      };
+      }
+    };
+    b.notifyAnimateMove = (json) => {
+      if (b._onGodotAnimateMove) {
+        try {
+          b._onGodotAnimateMove(json);
+        } catch (e) {
+          console.error('[GodotAdapter] Error in _onGodotAnimateMove:', e);
+        }
+      }
+    };
+    b.notifyBanterStream = (color, text) => {
+      if (b._onGodotBanterStream) {
+        try {
+          b._onGodotBanterStream(color, text);
+        } catch (e) {
+          console.error('[GodotAdapter] Error in _onGodotBanterStream:', e);
+        }
+      }
+    };
+    b.notifyPlayerInfo = (color, json) => {
+      if (b._onGodotPlayerInfo) {
+        try {
+          b._onGodotPlayerInfo(color, json);
+        } catch (e) {
+          console.error('[GodotAdapter] Error in _onGodotPlayerInfo:', e);
+        }
+      }
+    };
+    b.notifySpectatorMode = (active, paused) => {
+      if (b._onGodotSpectatorMode) {
+        try {
+          b._onGodotSpectatorMode(Boolean(active), Boolean(paused));
+        } catch (e) {
+          console.error('[GodotAdapter] Error in _onGodotSpectatorMode:', e);
+        }
+      }
+    };
+    b.notifyBoardFlipped = (flipped) => {
+      if (b._onGodotBoardFlipped) {
+        try {
+          b._onGodotBoardFlipped(Boolean(flipped));
+        } catch (e) {
+          console.error('[GodotAdapter] Error in _onGodotBoardFlipped:', e);
+        }
+      }
+    };
+    b.notifyShowNotation = (show) => {
+      if (b._onGodotShowNotation) {
+        try {
+          b._onGodotShowNotation(Boolean(show));
+        } catch (e) {
+          console.error('[GodotAdapter] Error in _onGodotShowNotation:', e);
+        }
+      }
+    };
+    b.notifyDownloadProgress = (json) => {
+      if (b._onGodotDownloadProgress) {
+        try {
+          b._onGodotDownloadProgress(json);
+        } catch (e) {
+          console.error('[GodotAdapter] Error in _onGodotDownloadProgress:', e);
+        }
+      }
+    };
 
-      const prevOnAnimationComplete = existing.onAnimationComplete;
-      existing.onAnimationComplete = () => {
-        this._handleAnimationComplete();
-        if (typeof prevOnAnimationComplete === 'function') prevOnAnimationComplete();
-      };
+    // Godot -> JS callbacks
+    const prevOnSquareClicked = b.onSquareClicked;
+    b.onSquareClicked = (index) => {
+      this.triggerSquareClick(index);
+      if (typeof prevOnSquareClicked === 'function') prevOnSquareClicked(index);
+    };
 
-      const prevOnLaunchMatch = existing.onLaunchMatch;
-      existing.onLaunchMatch = (configJson) => {
-        this._handleLaunchMatch(configJson);
-        if (typeof prevOnLaunchMatch === 'function') prevOnLaunchMatch(configJson);
-      };
+    const prevOnAnimationComplete = b.onAnimationComplete;
+    b.onAnimationComplete = () => {
+      this._handleAnimationComplete();
+      if (typeof prevOnAnimationComplete === 'function') prevOnAnimationComplete();
+    };
 
-      const prevOnResetGame = existing.onResetGame;
-      existing.onResetGame = () => {
-        this._handleResetGame();
-        if (typeof prevOnResetGame === 'function') prevOnResetGame();
-      };
+    const prevOnLaunchMatch = b.onLaunchMatch;
+    b.onLaunchMatch = (configJson) => {
+      this._handleLaunchMatch(configJson);
+      if (typeof prevOnLaunchMatch === 'function') prevOnLaunchMatch(configJson);
+    };
 
-      const prevOnSpectatorAction = existing.onSpectatorAction;
-      existing.onSpectatorAction = (action, value) => {
-        this._handleSpectatorAction(action, value);
-        if (typeof prevOnSpectatorAction === 'function') prevOnSpectatorAction(action, value);
-      };
+    const prevOnResetGame = b.onResetGame;
+    b.onResetGame = () => {
+      this._handleResetGame();
+      if (typeof prevOnResetGame === 'function') prevOnResetGame();
+    };
 
-      const prevOnGodotReady = existing.onGodotReady;
-      existing.onGodotReady = () => {
-        this._handleGodotReady();
-        if (typeof prevOnGodotReady === 'function') prevOnGodotReady();
-      };
+    const prevOnSpectatorAction = b.onSpectatorAction;
+    b.onSpectatorAction = (action, value) => {
+      this._handleSpectatorAction(action, value);
+      if (typeof prevOnSpectatorAction === 'function') prevOnSpectatorAction(action, value);
+    };
 
-      existing.onBoardFlipped = (flipped) => {
-        this.setBoardFlipped(flipped);
-      };
-      existing.onShowNotation = (show) => {
-        this.setShowNotation(show);
-      };
-      existing.onMuted = (muted) => {
-        this.setMuted(muted);
-      };
-    }
+    const prevOnGodotReady = b.onGodotReady;
+    b.onGodotReady = () => {
+      this._handleGodotReady();
+      if (typeof prevOnGodotReady === 'function') prevOnGodotReady();
+    };
+
+    b.onBoardFlipped = (flipped) => {
+      this.setBoardFlipped(flipped);
+    };
+    b.onShowNotation = (show) => {
+      this.setShowNotation(show);
+    };
+    b.onMuted = (muted) => {
+      this.setMuted(muted);
+    };
+
+    return b;
 
     return root.GodotCheckersBridge;
   }

@@ -17,7 +17,7 @@ extends Node3D
 func _ready() -> void:
 	# Orient camera to look at the board center with slight forward bias to clear top HUD
 	if camera != null:
-		camera.look_at(Vector3(0, 0, -0.4), Vector3.UP)
+		camera.look_at(Vector3(0, 0, -0.2), Vector3.UP)
 
 	# Connect Autoload Bridge signals
 	if Bridge != null:
