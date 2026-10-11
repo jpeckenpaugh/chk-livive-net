@@ -1,16 +1,13 @@
 /**
  * @file llm_player.js
  * LLM-powered player coordinating Session A (Tactical Move Selection)
- * and Session B (Personality Banter Streamer) with fallback support.
+ * and Session B (Personality Banter Streamer) via dedicated Web Worker bridge.
  */
 
 import { BasePlayer } from './base_player.js';
 import { getPersona, DEFAULT_PERSONA_RED, DEFAULT_PERSONA_BLACK } from '../llm/personas.js';
 import { DEFAULT_MODEL_ID } from '../llm/model_registry.js';
-import { buildTacticalPrompt, buildBanterPrompt } from '../llm/prompts.js';
-import { executeMoveSelectionWithRetries } from '../llm/parser.js';
-import { webLLMService } from '../llm/web_llm_service.js';
-import { CheckersAI } from '../ai.js';
+import { llmWorkerBridge, LLMWorkerBridge } from '../workers/llm_bridge.js';
 import { PLAYER_RED } from '../state.js';
 
 export class LLMPlayer extends BasePlayer {
@@ -22,7 +19,8 @@ export class LLMPlayer extends BasePlayer {
    * @param {string} [options.personaId] - Persona key ('pirate', 'victorian', etc.)
    * @param {string} [options.modelId]
    * @param {'wild'|'grandmaster'} [options.tacticalMode='wild']
-   * @param {WebLLMService} [options.service] - Optional custom WebLLMService instance
+   * @param {import('../llm/web_llm_service.js').WebLLMService} [options.service] - Custom WebLLMService instance
+   * @param {LLMWorkerBridge} [options.bridge] - Custom worker bridge instance
    */
   constructor({
     id,
@@ -31,7 +29,8 @@ export class LLMPlayer extends BasePlayer {
     personaId,
     modelId = DEFAULT_MODEL_ID,
     tacticalMode = 'wild',
-    service = webLLMService
+    service = null,
+    bridge = null
   }) {
     const defaultPersonaKey = color === PLAYER_RED ? DEFAULT_PERSONA_RED : DEFAULT_PERSONA_BLACK;
     const persona = getPersona(personaId || defaultPersonaKey);
@@ -47,9 +46,17 @@ export class LLMPlayer extends BasePlayer {
     this.persona = persona;
     this.modelId = modelId;
     this.tacticalMode = tacticalMode;
-    this.service = service;
 
-    this.minimaxHelper = new CheckersAI('medium');
+    // Use custom bridge if provided, or wrap custom service, or use shared bridge
+    if (bridge) {
+      this.bridge = bridge;
+    } else if (service) {
+      this.bridge = new LLMWorkerBridge({ service });
+    } else {
+      this.bridge = llmWorkerBridge;
+    }
+
+    this.service = service || this.bridge.service;
     this.lastBanter = '';
     this.lastOpponentBanter = '';
     this._abortController = null;
@@ -73,15 +80,15 @@ export class LLMPlayer extends BasePlayer {
   }
 
   /**
-   * Request move selection via Session A (Tactical Engine).
+   * Request move selection via Session A (Tactical Engine in Web Worker).
    * @param {Object} context
-   * @returns {Promise<{ move: Object, reasoning: string, isFallback: boolean, banterPromise?: Promise<string> }>}
+   * @returns {Promise<{ move: Object, reasoning: string, isFallback: boolean, attempts: number, rawPrompt: Array, rawResponse: string, latencyMs: number }>}
    */
   async requestMove(context) {
     const { board, turn, mustContinueJumpFrom, legalMoves, signal } = context;
 
     if (!legalMoves || legalMoves.length === 0) {
-      return { move: null, reasoning: 'No legal moves available' };
+      return { move: null, reasoning: 'No legal moves available', isFallback: false };
     }
 
     // Single forced move shortcut: immediately choose to conserve compute
@@ -89,60 +96,39 @@ export class LLMPlayer extends BasePlayer {
       return {
         move: legalMoves[0],
         reasoning: legalMoves[0].isJump ? 'Forced mandatory jump' : 'Single legal move',
-        isFallback: false
+        isFallback: false,
+        attempts: 1
       };
     }
 
-    // Ensure model is loaded in service
-    await this.service.loadModel(this.modelId);
-
-    // Optional Minimax candidate annotations in Grandmaster mode
-    let evaluatedCandidates = null;
-    if (this.tacticalMode === 'grandmaster') {
-      const best = this.minimaxHelper.getBestMove({ board, turn, mustContinueJumpFrom });
-      evaluatedCandidates = legalMoves.map((m) => ({
-        move: m,
-        rating: (best && m.from === best.from && m.to === best.to)
-          ? 'Recommended Master Move'
-          : (m.isJump ? 'Mandatory Capture' : 'Standard Development')
-      }));
+    // Ensure model is initialized if using service directly in mock
+    if (this.service && typeof this.service.loadModel === 'function' && !this.bridge.isWorkerReady) {
+      await this.service.loadModel(this.modelId);
     }
 
-    const messages = buildTacticalPrompt({
+    const result = await this.bridge.generateMove({
       board,
       turn,
+      mustContinueJumpFrom,
       legalMoves,
       tacticalMode: this.tacticalMode,
-      evaluatedCandidates
+      personaId: this.persona?.id,
+      signal
     });
 
-    const queryFn = async (msgs) => {
-      return await this.service.chatCompletion({
-        messages: msgs,
-        temperature: 0.1,
-        max_tokens: 60,
-        signal
-      });
+    return {
+      move: result.chosenMove,
+      reasoning: result.reasoning,
+      isFallback: Boolean(result.isFallback),
+      attempts: result.attempts || 1,
+      rawPrompt: result.rawPrompt,
+      rawResponse: result.rawResponse,
+      latencyMs: result.latencyMs
     };
-
-    const fallbackFn = () => {
-      const best = this.minimaxHelper.getBestMove({ board, turn, mustContinueJumpFrom });
-      return best || legalMoves[0];
-    };
-
-    const selectionResult = await executeMoveSelectionWithRetries({
-      queryFn,
-      initialMessages: messages,
-      legalMoves,
-      maxRetries: 2,
-      fallbackFn
-    });
-
-    return selectionResult;
   }
 
   /**
-   * Streams banter for Session B (Personality Banter Streamer).
+   * Streams banter for Session B (Personality Banter Streamer in Web Worker).
    * @param {Object} options
    * @param {Object} options.move - Move executed
    * @param {Int8Array} options.board - Board after move
@@ -154,20 +140,13 @@ export class LLMPlayer extends BasePlayer {
    */
   async streamBanter({ move, board, turn, crowned = false, onToken = null, signal = null }) {
     try {
-      const messages = buildBanterPrompt({
+      const banter = await this.bridge.streamBanter({
         persona: this.persona,
         move,
         board,
         turn,
         crowned,
-        opponentBanter: this.lastOpponentBanter
-      });
-
-      const banter = await this.service.chatCompletion({
-        messages,
-        temperature: 0.85,
-        max_tokens: 50,
-        stream: true,
+        opponentBanter: this.lastOpponentBanter,
         onToken,
         signal
       });

@@ -1,7 +1,8 @@
 /**
  * @file controller.js
- * Game orchestration, turn lifecycle, selection state machine,
- * pluggable player architecture, WebLLM banter integration, and Model vs Model spectator arena.
+ * Game orchestration, lifecycle state machine (TITLE, PRELOAD, PLAYING, GAMEOVER),
+ * turn lifecycle, selection state machine, pluggable player architecture,
+ * dedicated Web Worker LLM integration, and Model vs Model spectator arena.
  */
 
 import {
@@ -31,6 +32,18 @@ import { checkWebGPUSupport } from './llm/gpu_check.js';
 import { formatMoveDescription } from './llm/prompts.js';
 import { DEFAULT_MODEL_ID, getPreferredModelId, setPreferredModelId } from './llm/model_registry.js';
 import { DEFAULT_PERSONA_RED, DEFAULT_PERSONA_BLACK } from './llm/personas.js';
+import { llmWorkerBridge } from './workers/llm_bridge.js';
+import { debugInspector } from './llm/debug_inspector.js';
+
+/**
+ * Game lifecycle states
+ */
+export const LIFECYCLE = {
+  TITLE: 'TITLE',
+  PRELOAD: 'PRELOAD',
+  PLAYING: 'PLAYING',
+  GAMEOVER: 'GAMEOVER'
+};
 
 export class CheckersController {
   /**
@@ -58,7 +71,10 @@ export class CheckersController {
     this.winReason = null;
     this.isAnimating = false;
 
-    // Game Mode: 'llm', 'minimax', 'pvp', or 'arena' (legacy 'ai' maps to 'minimax' or 'llm')
+    // Lifecycle state: TITLE | PRELOAD | PLAYING | GAMEOVER
+    this.lifecycleState = LIFECYCLE.TITLE;
+
+    // Game Mode: 'minimax' | 'llm' | 'pvp' | 'arena'
     this.gameMode = 'minimax';
     this.difficulty = 'medium';
 
@@ -70,6 +86,10 @@ export class CheckersController {
     this.spectatorState = 'playing'; // 'playing' | 'paused'
     this.spectatorSpeed = 1600;      // Milliseconds delay between spectator moves
     this.isStepActive = false;
+
+    // Background worker bridge and debug inspector
+    this.bridge = llmWorkerBridge;
+    this.debugInspector = debugInspector;
 
     // Pluggable Player Registry
     this.players = {
@@ -132,7 +152,62 @@ export class CheckersController {
   }
 
   /**
-   * Initializes event listeners, model listeners, and starts the game.
+   * Updates current lifecycle state and manages screen visibility.
+   * @param {string} state - Member of LIFECYCLE
+   */
+  setLifecycleState(state) {
+    this.lifecycleState = state;
+
+    if (typeof document === 'undefined') return;
+
+    const screenTitle = document.getElementById('screen-title');
+    const screenPreload = document.getElementById('screen-preload');
+    const screenGame = document.getElementById('screen-game');
+
+    if (screenTitle) {
+      if (state === LIFECYCLE.TITLE) {
+        screenTitle.classList.remove('hidden');
+      } else {
+        screenTitle.classList.add('hidden');
+      }
+    }
+
+    if (screenPreload) {
+      if (state === LIFECYCLE.PRELOAD) {
+        screenPreload.classList.remove('hidden');
+      } else {
+        screenPreload.classList.add('hidden');
+      }
+    }
+
+    if (screenGame) {
+      if (state === LIFECYCLE.PLAYING || state === LIFECYCLE.GAMEOVER) {
+        screenGame.classList.remove('hidden');
+      } else {
+        screenGame.classList.add('hidden');
+      }
+    }
+  }
+
+  /**
+   * Exits active game to Title / Setup Screen.
+   */
+  exitToTitle() {
+    if (this.turnAbortController) {
+      this.turnAbortController.abort();
+      this.turnAbortController = null;
+    }
+    if (this.aiTimeoutId !== null) {
+      clearTimeout(this.aiTimeoutId);
+      this.aiTimeoutId = null;
+    }
+
+    this.spectatorPause();
+    this.setLifecycleState(LIFECYCLE.TITLE);
+  }
+
+  /**
+   * Initializes event listeners, UI bindings, and sets up Title Screen.
    */
   init() {
     // 1. Board click delegation
@@ -151,6 +226,21 @@ export class CheckersController {
       const btnNewGame = document.getElementById('btn-new-game');
       if (btnNewGame) {
         btnNewGame.addEventListener('click', () => this.resetGame());
+      }
+
+      const btnExitToTitle = document.getElementById('btn-exit-to-title');
+      if (btnExitToTitle) {
+        btnExitToTitle.addEventListener('click', () => this.exitToTitle());
+      }
+
+      const btnDebugInspector = document.getElementById('btn-debug-inspector');
+      if (btnDebugInspector) {
+        btnDebugInspector.addEventListener('click', () => this.debugInspector.open());
+      }
+
+      const btnSpectatorDebug = document.getElementById('btn-spectator-debug');
+      if (btnSpectatorDebug) {
+        btnSpectatorDebug.addEventListener('click', () => this.debugInspector.open());
       }
 
       const btnModalRestart = document.getElementById('btn-modal-restart');
@@ -199,6 +289,10 @@ export class CheckersController {
         selectDifficulty.addEventListener('change', (e) => this.setDifficulty(e.target.value));
       }
 
+      // Title & Preload Screen Bindings
+      this._bindTitleControls();
+      this._bindPreloadControls();
+
       // Arena Setup and Spectator Control bindings
       this._bindArenaControls();
     }
@@ -215,15 +309,419 @@ export class CheckersController {
       window.addEventListener('keydown', (e) => this.handleKeyDown(e));
     }
 
-    // 5. Initial hardware & WebGPU check to configure initial default game mode
-    this._checkWebGPUAndSetInitialMode();
+    // 5. Setup initial lifecycle screen
+    if (typeof document !== 'undefined' && document.getElementById('screen-title')) {
+      this.setLifecycleState(LIFECYCLE.TITLE);
+    } else {
+      // In headless test environments without DOM screens, transition directly to PLAYING
+      this.setLifecycleState(LIFECYCLE.PLAYING);
+      this.updateView();
+      if (!this.players[this.state.turn].isInteractive) {
+        this.scheduleAutomatedTurn();
+      }
+    }
+  }
 
-    // 6. Initial render
-    this.updateView();
+  /**
+   * Binds Title screen mode selection and launch actions.
+   * @private
+   */
+  _bindTitleControls() {
+    if (typeof document === 'undefined') return;
 
-    // Check if initial turn belongs to automated player
-    if (!this.players[this.state.turn].isInteractive) {
-      this.scheduleAutomatedTurn();
+    let selectedMode = 'minimax';
+    const modeCards = [
+      { id: 'title-card-minimax', mode: 'minimax', panel: 'panel-setup-minimax', needsNeural: false },
+      { id: 'title-card-llm', mode: 'llm', panel: 'panel-setup-llm', needsNeural: true },
+      { id: 'title-card-arena', mode: 'arena', panel: 'panel-setup-arena', needsNeural: true },
+      { id: 'title-card-pvp', mode: 'pvp', panel: 'panel-setup-pvp', needsNeural: false }
+    ];
+
+    const neuralBox = document.getElementById('panel-setup-neural-global');
+
+    modeCards.forEach(({ id, mode, panel, needsNeural }) => {
+      const card = document.getElementById(id);
+      if (!card) return;
+
+      card.addEventListener('click', () => {
+        selectedMode = mode;
+        modeCards.forEach((c) => {
+          document.getElementById(c.id)?.classList.remove('active');
+          document.getElementById(c.panel)?.classList.add('hidden');
+        });
+        card.classList.add('active');
+        document.getElementById(panel)?.classList.remove('hidden');
+
+        if (neuralBox) {
+          if (needsNeural) {
+            neuralBox.classList.remove('hidden');
+          } else {
+            neuralBox.classList.add('hidden');
+          }
+        }
+      });
+    });
+
+    // Launch Match Button
+    const btnLaunch = document.getElementById('btn-launch-match');
+    if (btnLaunch) {
+      btnLaunch.addEventListener('click', () => {
+        const difficulty = document.getElementById('title-minimax-difficulty')?.value || this.difficulty;
+        const minimaxColor = document.getElementById('title-minimax-color')?.value || 'red';
+        const llmColor = document.getElementById('title-llm-color')?.value || 'red';
+        const llmPersona = document.getElementById('title-llm-persona')?.value || DEFAULT_PERSONA_BLACK;
+
+        const arenaRedType = document.getElementById('title-arena-red-type')?.value || 'llm';
+        const arenaRedPersona = document.getElementById('title-arena-red-persona')?.value || DEFAULT_PERSONA_RED;
+        const arenaBlackType = document.getElementById('title-arena-black-type')?.value || 'llm';
+        const arenaBlackPersona = document.getElementById('title-arena-black-persona')?.value || DEFAULT_PERSONA_BLACK;
+
+        const modelId = document.getElementById('title-model-select')?.value || this.modelId;
+        const tacticalMode = document.getElementById('title-tactical-mode')?.value || 'wild';
+
+        this.launchMatch({
+          mode: selectedMode,
+          difficulty,
+          minimaxColor,
+          llmColor,
+          llmPersona,
+          arenaRedType,
+          arenaRedPersona,
+          arenaBlackType,
+          arenaBlackPersona,
+          modelId,
+          tacticalMode
+        });
+      });
+    }
+
+    const btnTitleDashboard = document.getElementById('btn-title-llm-dashboard');
+    if (btnTitleDashboard) {
+      btnTitleDashboard.addEventListener('click', () => {
+        const modal = document.getElementById('modal-llm-dashboard');
+        if (modal) modal.classList.remove('hidden');
+      });
+    }
+
+    const btnTitleDebug = document.getElementById('btn-title-debug');
+    if (btnTitleDebug) {
+      btnTitleDebug.addEventListener('click', () => this.debugInspector.open());
+    }
+  }
+
+  /**
+   * Binds Preload staging screen actions.
+   * @private
+   */
+  _bindPreloadControls() {
+    if (typeof document === 'undefined') return;
+
+    const btnCancel = document.getElementById('btn-preload-cancel');
+    if (btnCancel) {
+      btnCancel.addEventListener('click', () => this.exitToTitle());
+    }
+
+    const btnReturnTitle = document.getElementById('btn-preload-return-title');
+    if (btnReturnTitle) {
+      btnReturnTitle.addEventListener('click', () => this.exitToTitle());
+    }
+
+    const btnFallbackMinimax = document.getElementById('btn-preload-fallback-minimax');
+    if (btnFallbackMinimax) {
+      btnFallbackMinimax.addEventListener('click', () => {
+        this.launchMatch({
+          mode: 'minimax',
+          difficulty: this.difficulty,
+          minimaxColor: 'red'
+        });
+      });
+    }
+  }
+
+  /**
+   * Launches match according to configuration.
+   * If an LLM is required, stages through dedicated Pre-load screen.
+   * If Human vs Minimax or Pass & Play, launches immediately.
+   * @param {Object} config
+   */
+  async launchMatch(config = {}) {
+    const mode = config.mode || this.gameMode;
+    const modelId = config.modelId || this.modelId;
+    const tacticalMode = config.tacticalMode || this.tacticalMode;
+
+    this.modelId = modelId;
+    this.tacticalMode = tacticalMode;
+    setPreferredModelId(modelId);
+
+    // Determine if any participant requires an LLM
+    let requiresLLM = false;
+    if (mode === 'llm') {
+      requiresLLM = true;
+    } else if (mode === 'arena') {
+      if (config.arenaRedType === 'llm' || config.arenaBlackType === 'llm') {
+        requiresLLM = true;
+      }
+    } else if (config.redType === 'llm' || config.blackType === 'llm') {
+      requiresLLM = true;
+    }
+
+    if (!requiresLLM) {
+      // Immediate launch: skip pre-load staging
+      this._applyMatchConfiguration(config);
+      this.setLifecycleState(LIFECYCLE.PLAYING);
+      this.resetGame();
+      return;
+    }
+
+    // LLM Required: Transition to Pre-load Gate
+    this.setLifecycleState(LIFECYCLE.PRELOAD);
+    await this._runPreloadPipeline({
+      modelId,
+      onSuccess: () => {
+        this._applyMatchConfiguration(config);
+        this.setLifecycleState(LIFECYCLE.PLAYING);
+        this.resetGame();
+      },
+      onError: (err) => {
+        this._showPreloadError(err, config);
+      }
+    });
+  }
+
+  /**
+   * Runs the 4-step Pre-load verification pipeline.
+   * @private
+   */
+  async _runPreloadPipeline({ modelId, onSuccess, onError }) {
+    if (typeof document === 'undefined') {
+      onSuccess();
+      return;
+    }
+
+    // Reset pipeline UI elements
+    const stepGpu = document.getElementById('pipeline-gpu');
+    const stepDownload = document.getElementById('pipeline-download');
+    const stepCompile = document.getElementById('pipeline-compile');
+    const stepSanity = document.getElementById('pipeline-sanity');
+
+    const progressFill = document.getElementById('preload-progress-fill');
+    const progressLabel = document.getElementById('preload-progress-label');
+    const progressPercent = document.getElementById('preload-progress-percent');
+    const errorBox = document.getElementById('preload-error-box');
+
+    if (errorBox) errorBox.classList.add('hidden');
+
+    const setStepState = (el, state, desc) => {
+      if (!el) return;
+      el.classList.remove('active', 'done', 'error');
+      if (state) el.classList.add(state);
+      const icon = el.querySelector('.pipeline-status-icon');
+      if (icon) {
+        if (state === 'done') icon.textContent = '✓';
+        else if (state === 'active') icon.textContent = '🔄';
+        else if (state === 'error') icon.textContent = '❌';
+        else icon.textContent = '⏳';
+      }
+      if (desc) {
+        const descEl = el.querySelector('.pipeline-desc');
+        if (descEl) descEl.textContent = desc;
+      }
+    };
+
+    setStepState(stepGpu, 'active', 'Querying GPU adapter...');
+    setStepState(stepDownload, '', 'Pending...');
+    setStepState(stepCompile, '', 'Pending...');
+    setStepState(stepSanity, '', 'Pending...');
+
+    if (progressFill) progressFill.style.width = '10%';
+    if (progressLabel) progressLabel.textContent = 'Checking WebGPU Hardware...';
+    if (progressPercent) progressPercent.textContent = '10%';
+
+    try {
+      // Step 1: WebGPU Check
+      const gpuResult = await checkWebGPUSupport();
+      if (!gpuResult.supported) {
+        setStepState(stepGpu, 'error', gpuResult.reason || 'WebGPU unsupported');
+        throw new Error(gpuResult.reason || 'WebGPU is not supported by your browser or hardware.');
+      }
+      setStepState(stepGpu, 'done', `Detected: ${gpuResult.adapterName || 'WebGPU Compatible Adapter'}`);
+
+      // Step 2, 3, 4: Model loading in worker with progress reporting
+      setStepState(stepDownload, 'active', 'Connecting to weight cache...');
+      if (progressLabel) progressLabel.textContent = `Loading ${modelId}...`;
+
+      await this.bridge.initModel({
+        modelId,
+        onProgress: (report) => {
+          const pct = Math.min(100, Math.round((report.progress || 0) * 100));
+          if (progressFill) progressFill.style.width = `${pct}%`;
+          if (progressPercent) progressPercent.textContent = `${pct}%`;
+          if (progressLabel) progressLabel.textContent = report.text || 'Loading weights...';
+
+          if (pct >= 50 && pct < 85) {
+            setStepState(stepDownload, 'done', 'Weights cached');
+            setStepState(stepCompile, 'active', 'Compiling WebGPU pipeline shaders...');
+          } else if (pct >= 85) {
+            setStepState(stepCompile, 'done', 'Shaders compiled');
+            setStepState(stepSanity, 'active', 'Running sanity inference...');
+          }
+        }
+      });
+
+      setStepState(stepDownload, 'done', 'Weights verified');
+      setStepState(stepCompile, 'done', 'Shaders compiled');
+      setStepState(stepSanity, 'done', 'Pipeline verified ready');
+
+      if (progressFill) progressFill.style.width = '100%';
+      if (progressPercent) progressPercent.textContent = '100%';
+      if (progressLabel) progressLabel.textContent = 'Ready!';
+
+      // Short buffer so user can see verification success
+      await new Promise((r) => setTimeout(r, 200));
+
+      onSuccess();
+    } catch (err) {
+      setStepState(stepDownload, 'error', 'Initialization aborted');
+      onError(err);
+    }
+  }
+
+  /**
+   * Displays Pre-load error box with recovery buttons.
+   * @private
+   */
+  _showPreloadError(err, originalConfig) {
+    if (typeof document === 'undefined') return;
+
+    const errorBox = document.getElementById('preload-error-box');
+    const errorDesc = document.getElementById('preload-error-desc');
+    const btnRetry = document.getElementById('btn-preload-retry');
+
+    if (errorDesc) {
+      errorDesc.textContent = err.message || 'An error occurred while loading the neural model.';
+    }
+    if (errorBox) {
+      errorBox.classList.remove('hidden');
+    }
+
+    if (btnRetry) {
+      btnRetry.onclick = () => {
+        this.launchMatch(originalConfig);
+      };
+    }
+  }
+
+  /**
+   * Applies match configuration to player registry.
+   * @private
+   */
+  _applyMatchConfiguration(config) {
+    const mode = config.mode || this.gameMode;
+    this.gameMode = mode;
+
+    if (mode === 'minimax') {
+      const isRedPlayer = (config.minimaxColor || 'red') === 'red';
+      const diff = config.difficulty || this.difficulty;
+      this.difficulty = diff;
+
+      if (isRedPlayer) {
+        this.setPlayer(PLAYER_RED, new HumanPlayer({ id: 'player-red', name: 'Red (Human)', color: PLAYER_RED }));
+        this.setPlayer(PLAYER_BLACK, new MinimaxPlayer({
+          id: 'player-black',
+          name: `Black (Minimax ${diff})`,
+          color: PLAYER_BLACK,
+          difficulty: diff
+        }));
+      } else {
+        this.setPlayer(PLAYER_RED, new MinimaxPlayer({
+          id: 'player-red',
+          name: `Red (Minimax ${diff})`,
+          color: PLAYER_RED,
+          difficulty: diff
+        }));
+        this.setPlayer(PLAYER_BLACK, new HumanPlayer({ id: 'player-black', name: 'Black (Human)', color: PLAYER_BLACK }));
+      }
+    } else if (mode === 'llm') {
+      const isRedPlayer = (config.llmColor || 'red') === 'red';
+      const persona = config.llmPersona || DEFAULT_PERSONA_BLACK;
+
+      if (isRedPlayer) {
+        this.setPlayer(PLAYER_RED, new HumanPlayer({ id: 'player-red', name: 'Red (Human)', color: PLAYER_RED }));
+        this.setPlayer(PLAYER_BLACK, new LLMPlayer({
+          id: 'player-black',
+          color: PLAYER_BLACK,
+          personaId: persona,
+          modelId: this.modelId,
+          tacticalMode: this.tacticalMode
+        }));
+      } else {
+        this.setPlayer(PLAYER_RED, new LLMPlayer({
+          id: 'player-red',
+          color: PLAYER_RED,
+          personaId: persona,
+          modelId: this.modelId,
+          tacticalMode: this.tacticalMode
+        }));
+        this.setPlayer(PLAYER_BLACK, new HumanPlayer({ id: 'player-black', name: 'Black (Human)', color: PLAYER_BLACK }));
+      }
+    } else if (mode === 'arena') {
+      const redType = config.arenaRedType || 'llm';
+      const redPersona = config.arenaRedPersona || DEFAULT_PERSONA_RED;
+      const blackType = config.arenaBlackType || 'llm';
+      const blackPersona = config.arenaBlackPersona || DEFAULT_PERSONA_BLACK;
+
+      let redPlayer;
+      if (redType === 'minimax') {
+        redPlayer = new MinimaxPlayer({
+          id: 'player-red',
+          name: `Red (Minimax ${this.difficulty})`,
+          color: PLAYER_RED,
+          difficulty: this.difficulty
+        });
+      } else {
+        redPlayer = new LLMPlayer({
+          id: 'player-red',
+          color: PLAYER_RED,
+          personaId: redPersona,
+          modelId: this.modelId,
+          tacticalMode: this.tacticalMode
+        });
+      }
+
+      let blackPlayer;
+      if (blackType === 'minimax') {
+        blackPlayer = new MinimaxPlayer({
+          id: 'player-black',
+          name: `Black (Minimax ${this.difficulty})`,
+          color: PLAYER_BLACK,
+          difficulty: this.difficulty
+        });
+      } else {
+        blackPlayer = new LLMPlayer({
+          id: 'player-black',
+          color: PLAYER_BLACK,
+          personaId: blackPersona,
+          modelId: this.modelId,
+          tacticalMode: this.tacticalMode
+        });
+      }
+
+      this.setPlayer(PLAYER_RED, redPlayer);
+      this.setPlayer(PLAYER_BLACK, blackPlayer);
+      this.spectatorState = 'playing';
+    } else if (mode === 'pvp') {
+      this.setPlayer(PLAYER_RED, new HumanPlayer({ id: 'player-red', name: 'Red (Player 1)', color: PLAYER_RED }));
+      this.setPlayer(PLAYER_BLACK, new HumanPlayer({ id: 'player-black', name: 'Black (Player 2)', color: PLAYER_BLACK }));
+    }
+
+    // Sync header dropdowns
+    if (typeof document !== 'undefined') {
+      const selectMode = document.getElementById('select-game-mode');
+      if (selectMode) selectMode.value = this.gameMode;
+      const selectDiff = document.getElementById('select-difficulty');
+      if (selectDiff) {
+        selectDiff.style.display = (this.gameMode === 'minimax') ? 'inline-block' : 'none';
+      }
     }
   }
 
@@ -236,10 +734,8 @@ export class CheckersController {
     try {
       const gpuResult = await checkWebGPUSupport();
       if (gpuResult.supported) {
-        // WebGPU is supported: default to LLM AI mode
         this.setGameMode('llm', false);
       } else {
-        // WebGPU is not supported: set to Minimax with status notice
         this.setGameMode('minimax', false);
         this.statusMessage = 'WebGPU not detected; using Minimax (Classic AI).';
         this.updateView();
@@ -298,7 +794,6 @@ export class CheckersController {
 
     if (btnOpenArena && modalArena) {
       btnOpenArena.addEventListener('click', () => {
-        // Ensure current preferred model is selected when opening modal
         if (arenaModelSelect) {
           arenaModelSelect.value = this.modelId;
         }
@@ -342,7 +837,6 @@ export class CheckersController {
     const modelId = document.getElementById('arena-model')?.value || this.modelId || DEFAULT_MODEL_ID;
     const tacticalMode = document.getElementById('arena-tactical-mode')?.value || 'wild';
 
-    // Persist preferred model selection
     setPreferredModelId(modelId);
 
     this.configureMatchup({
@@ -426,7 +920,6 @@ export class CheckersController {
       this.gameMode = 'ai';
     }
 
-    // Sync select dropdown in header if present
     if (typeof document !== 'undefined') {
       const selectMode = document.getElementById('select-game-mode');
       if (selectMode) selectMode.value = this.gameMode;
@@ -548,55 +1041,62 @@ export class CheckersController {
         }
         this.executeMove(validMove);
       } else {
-        this.statusMessage = 'Multi-jump in progress! You must complete the capture chain.';
+        this.statusMessage = 'You must complete the multi-jump sequence!';
+        if (typeof this.renderer?.sound?.playIllegal === 'function') {
+          this.renderer.sound.playIllegal();
+        }
         this.updateView();
       }
       return;
     }
 
-    // Normal play: No piece currently selected
-    if (this.state.selectedSquare === null) {
-      const piece = this.state.board[index];
+    const selected = this.state.selectedSquare;
 
-      if (piece !== EMPTY && isPlayerPiece(piece, this.state.turn)) {
-        const pieceLegalMoves = legalMoves.filter((m) => m.from === index);
-        if (pieceLegalMoves.length > 0) {
+    // No square currently selected: attempt selection
+    if (selected === null) {
+      const piece = this.state.board[index];
+      if (isPlayerPiece(piece, this.state.turn)) {
+        const pieceHasLegalMove = legalMoves.some((m) => m.from === index);
+        if (pieceHasLegalMove) {
           this.state.selectedSquare = index;
           this.statusMessage = '';
         } else {
-          const hasJumps = legalMoves.some((m) => m.isJump);
-          this.statusMessage = hasJumps
-            ? 'Mandatory capture! You must select a piece that can jump.'
+          const hasAnyJump = legalMoves.some((m) => m.isJump);
+          this.statusMessage = hasAnyJump
+            ? 'Mandatory capture! You must jump.'
             : 'That piece has no legal moves.';
+          if (typeof this.renderer?.sound?.playIllegal === 'function') {
+            this.renderer.sound.playIllegal();
+          }
         }
       }
       this.updateView();
       return;
     }
 
-    // Piece already selected:
-    const selected = this.state.selectedSquare;
-
-    // Deselect if clicking the already selected piece
-    if (index === selected) {
+    // Square is already selected and user clicked it again: deselect
+    if (selected === index) {
       this.state.selectedSquare = null;
       this.statusMessage = '';
       this.updateView();
       return;
     }
 
-    // If clicking another friendly piece, switch selection if legal
-    const targetPiece = this.state.board[index];
-    if (targetPiece !== EMPTY && isPlayerPiece(targetPiece, this.state.turn)) {
-      const otherPieceMoves = legalMoves.filter((m) => m.from === index);
-      if (otherPieceMoves.length > 0) {
+    // User clicked another piece belonging to the active player
+    const clickedPiece = this.state.board[index];
+    if (isPlayerPiece(clickedPiece, this.state.turn)) {
+      const pieceHasLegalMove = legalMoves.some((m) => m.from === index);
+      if (pieceHasLegalMove) {
         this.state.selectedSquare = index;
         this.statusMessage = '';
       } else {
-        const hasJumps = legalMoves.some((m) => m.isJump);
-        this.statusMessage = hasJumps
-          ? 'Mandatory capture! You must select a piece that can jump.'
+        const hasAnyJump = legalMoves.some((m) => m.isJump);
+        this.statusMessage = hasAnyJump
+          ? 'Mandatory capture! You must jump.'
           : 'That piece has no legal moves.';
+        if (typeof this.renderer?.sound?.playIllegal === 'function') {
+          this.renderer.sound.playIllegal();
+        }
       }
       this.updateView();
       return;
@@ -610,7 +1110,6 @@ export class CheckersController {
       }
       this.executeMove(move);
     } else {
-      // Clicked an invalid destination square: deselect
       this.state.selectedSquare = null;
       this.statusMessage = '';
       this.updateView();
@@ -682,7 +1181,6 @@ export class CheckersController {
     this.state.board = nextBoard;
     this.lastMove = { from: move.from, to: move.to };
 
-    // Play appropriate sound effect
     if (move.isJump) {
       this.renderer.sound.playCapture();
     } else {
@@ -693,7 +1191,6 @@ export class CheckersController {
       this.renderer.sound.playCrown();
     }
 
-    // Check multi-jump continuation
     if (canContinueJump) {
       this.state.mustContinueJumpFrom = move.to;
       this.state.selectedSquare = move.to;
@@ -702,7 +1199,6 @@ export class CheckersController {
       this.state.mustContinueJumpFrom = null;
       this.state.selectedSquare = null;
       this.statusMessage = '';
-      // Pass turn to opponent
       this.state.turn = -this.state.turn;
     }
 
@@ -711,6 +1207,7 @@ export class CheckersController {
     if (winner !== null) {
       this.state.winner = winner;
       this.winReason = getGameOverReason(this.state.board, this.state.turn, this.halfMovesWithoutProgress);
+      this.lifecycleState = LIFECYCLE.GAMEOVER;
       this.renderer.sound.playWin();
     }
 
@@ -728,7 +1225,6 @@ export class CheckersController {
     if (this.players[PLAYER_RED]) this.players[PLAYER_RED].onMoveExecuted(moveRecord);
     if (this.players[PLAYER_BLACK]) this.players[PLAYER_BLACK].onMoveExecuted(moveRecord);
 
-    // If game ended, stop
     if (this.state.winner !== null) {
       return;
     }
@@ -737,7 +1233,6 @@ export class CheckersController {
     const nextPlayer = this.players[this.state.turn];
     if (!nextPlayer.isInteractive) {
       if (this.isSpectatorMode && this.isStepActive) {
-        // Single step completed: pause spectator
         this.isStepActive = false;
         this.spectatorPause();
         return;
@@ -848,22 +1343,18 @@ export class CheckersController {
           const reason = err.message || 'Move calculation failed';
           console.error(`[Controller] Error during ${activePlayer.name}'s move:`, err);
 
-          // Update turn message banner with explicit failure reason
           const errorBanner = `⚠️ LLM error: ${reason}. Fallback move executed.`;
           this.statusMessage = errorBanner;
           if (this.renderer && this.renderer.turnMessage) {
             this.renderer.turnMessage.textContent = errorBanner;
           }
 
-          // Log error to WebLLM service / Dashboard activity log
           webLLMService._log(`[Controller] ${activePlayer.name} error: ${reason}. Executing fallback move.`, 'error');
 
-          // Fallback move: execute first legal move (or minimax move) to keep game alive
           if (legalMoves.length > 0) {
             this.executeMove(legalMoves[0]);
           }
 
-          // Retain explicit banner after fallback move finalizes
           this.statusMessage = errorBanner;
           if (this.renderer && this.renderer.turnMessage) {
             this.renderer.turnMessage.textContent = errorBanner;
@@ -923,7 +1414,6 @@ export class CheckersController {
       this.spectatorState = 'playing';
     }
 
-    // Toggle difficulty selector visibility if in DOM (only needed for minimax/ai)
     if (typeof document !== 'undefined') {
       const selectDifficulty = document.getElementById('select-difficulty');
       if (selectDifficulty) {
@@ -975,7 +1465,6 @@ export class CheckersController {
 
     const mustJump = legalMoves.some((m) => m.isJump);
 
-    // Compute prey indices for jump targets
     const preyIndices = new Set();
     if (this.state.mustContinueJumpFrom !== null) {
       const jumps = legalMoves.filter((m) => m.from === this.state.mustContinueJumpFrom && m.isJump);
@@ -1058,7 +1547,7 @@ export class CheckersController {
     this.updateView();
 
     const activePlayer = this.players[this.state.turn];
-    if (activePlayer && !activePlayer.isInteractive) {
+    if (activePlayer && !activePlayer.isInteractive && this.lifecycleState === LIFECYCLE.PLAYING) {
       this.scheduleAutomatedTurn();
     }
   }

@@ -1,12 +1,13 @@
 /**
  * @file main.js
  * Application entry point for English Draughts.
- * Bootstraps renderer and controller upon DOM load.
+ * Bootstraps renderer, controller, LLM dashboard, and debug inspector upon DOM load.
  */
 
 import { CheckersRenderer } from './renderer.js';
 import { CheckersController } from './controller.js';
 import { LLMDashboard } from './llm/dashboard.js';
+import { debugInspector } from './llm/debug_inspector.js';
 
 window.addEventListener('DOMContentLoaded', () => {
   const boardElement = document.getElementById('board');
@@ -22,10 +23,13 @@ window.addEventListener('DOMContentLoaded', () => {
   const dashboard = new LLMDashboard();
   dashboard.init();
 
-  // Expose controller globally for debugging or automated testing if needed
+  debugInspector.init();
+
+  // Expose components globally for debugging or automated testing
   window.__checkers = {
     renderer,
     controller,
-    dashboard
+    dashboard,
+    debugInspector
   };
 });
