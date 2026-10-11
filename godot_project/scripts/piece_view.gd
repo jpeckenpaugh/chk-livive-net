@@ -15,10 +15,25 @@ var mat_gold: StandardMaterial3D
 
 @onready var body_mesh: MeshInstance3D = $BodyMesh
 @onready var crown_mesh: MeshInstance3D = $CrownMesh
+@onready var area3d: Area3D = $Area3D
 
 func _ready() -> void:
 	_init_materials()
 	_apply_visuals()
+	if area3d != null:
+		area3d.input_event.connect(_on_area_input_event)
+
+func _on_area_input_event(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_idx: int) -> void:
+	if event is InputEventMouseButton:
+		var mb: InputEventMouseButton = event
+		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
+			if square_index >= 0 and Bridge != null:
+				Bridge.notify_square_clicked(square_index)
+	elif event is InputEventScreenTouch:
+		var st: InputEventScreenTouch = event
+		if st.pressed:
+			if square_index >= 0 and Bridge != null:
+				Bridge.notify_square_clicked(square_index)
 
 func _init_materials() -> void:
 	if mat_red == null:

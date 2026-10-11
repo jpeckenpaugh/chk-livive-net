@@ -553,6 +553,10 @@ export class CheckersController {
       await this.bridge.initModel({
         modelId,
         onProgress: (report) => {
+          if (this.renderer && typeof this.renderer.updateDownloadProgress === 'function') {
+            this.renderer.updateDownloadProgress(report);
+          }
+
           const pct = Math.min(100, Math.round((report.progress || 0) * 100));
           if (progressFill) progressFill.style.width = `${pct}%`;
           if (progressPercent) progressPercent.textContent = `${pct}%`;
@@ -591,6 +595,15 @@ export class CheckersController {
    * @private
    */
   _showPreloadError(err, originalConfig) {
+    console.error('[Controller] Preload error:', err);
+    if (this.renderer && typeof this.renderer.updateDownloadProgress === 'function') {
+      this.renderer.updateDownloadProgress({
+        text: `Error: ${err.message || 'WebGPU initialization failed'}. Falling back to Minimax...`,
+        progress: 1.0,
+        error: true
+      });
+    }
+
     if (typeof document === 'undefined') return;
 
     const errorBox = document.getElementById('preload-error-box');
@@ -602,6 +615,15 @@ export class CheckersController {
     }
     if (errorBox) {
       errorBox.classList.remove('hidden');
+    } else {
+      // In Godot environment where DOM error box is absent, fallback to Minimax after brief notice
+      setTimeout(() => {
+        this.launchMatch({
+          mode: 'minimax',
+          difficulty: this.difficulty,
+          minimaxColor: (originalConfig && originalConfig.llmColor) || 'red'
+        });
+      }, 2500);
     }
 
     if (btnRetry) {

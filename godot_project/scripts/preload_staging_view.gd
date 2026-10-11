@@ -37,7 +37,17 @@ func _on_download_progress(data: Dictionary) -> void:
 	if status_label and text != "":
 		status_label.text = text
 
-	if pct >= 100.0:
+	var is_error: bool = bool(data.get("error", false))
+	if is_error:
+		if percent_label:
+			percent_label.text = "⚠️"
+		if status_label:
+			status_label.text = text
+		var tween: Tween = create_tween()
+		tween.tween_interval(2.5)
+		tween.tween_property(self, "modulate:a", 0.0, 0.4)
+		tween.tween_callback(func(): visible = false)
+	elif pct >= 100.0:
 		# Auto fade out smoothly when finished
 		var tween: Tween = create_tween()
 		tween.tween_interval(0.4)
