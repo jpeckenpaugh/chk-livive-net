@@ -41,6 +41,7 @@ export class LLMWorkerBridge {
 
     this.minimaxHelper = new CheckersAI('medium');
     this._customEngine = null;
+    this.workerFailed = false;
 
     this._reqCounter = 0;
   }
@@ -60,7 +61,7 @@ export class LLMWorkerBridge {
    * @returns {boolean}
    */
   canUseWorker() {
-    if (this.mockMode) return false;
+    if (this.mockMode || this.workerFailed) return false;
     if (this._customEngine !== null) return false;
     if (typeof window === 'undefined' || typeof Worker === 'undefined') return false;
     return true;
@@ -149,16 +150,20 @@ export class LLMWorkerBridge {
 
       this.worker.onmessage = (event) => this._handleWorkerMessage(event.data);
       this.worker.onerror = (err) => {
-        console.error('[LLMWorkerBridge] Worker error:', err);
-        // Reject all pending requests
+        const errorMsg = (err && err.message) ? err.message : (err && err.error?.message) ? err.error.message : 'Worker failure';
+        console.warn('[LLMWorkerBridge] Web Worker error event:', errorMsg, err);
+        this.workerFailed = true;
+        // Reject all pending requests so caller can fall back
         for (const [id, req] of this.pendingRequests.entries()) {
-          req.reject(new Error(`Worker error: ${err.message || 'Worker failure'}`));
+          req.reject(new Error(`Worker error: ${errorMsg}`));
         }
         this.pendingRequests.clear();
+        this.streamListeners.clear();
       };
     } catch (err) {
       console.warn('[LLMWorkerBridge] Failed to instantiate worker, falling back to in-process mode:', err);
       this.worker = null;
+      this.workerFailed = true;
     }
   }
 
@@ -264,16 +269,27 @@ export class LLMWorkerBridge {
         this._ensureWorker();
       }
 
-      if (this.worker) {
-        const reqId = this._nextId();
-        return await new Promise((resolve, reject) => {
-          this.pendingRequests.set(reqId, { resolve, reject });
-          this.worker.postMessage({
-            type: 'INIT',
-            id: reqId,
-            payload: { modelId }
+      if (this.worker && !this.workerFailed) {
+        try {
+          const reqId = this._nextId();
+          const result = await new Promise((resolve, reject) => {
+            this.pendingRequests.set(reqId, { resolve, reject });
+            this.worker.postMessage({
+              type: 'INIT',
+              id: reqId,
+              payload: { modelId }
+            });
           });
-        });
+          return result;
+        } catch (workerErr) {
+          console.warn('[LLMWorkerBridge] Web Worker initialization failed. Automatically switching to in-process WebLLM (rag-poc engine mode):', workerErr);
+          this.workerFailed = true;
+          if (this.worker) {
+            try { this.worker.terminate(); } catch (_) {}
+            this.worker = null;
+          }
+          this._notifyProgress({ text: 'Worker issue detected. Loading model in-process (WebGPU window mode)...', progress: 0.12 });
+        }
       }
 
       // Simulated / In-process fallback mode:
@@ -382,45 +398,55 @@ export class LLMWorkerBridge {
       this._ensureWorker();
     }
 
-    if (this.worker) {
-      const reqId = this._nextId();
-      return await new Promise((resolve, reject) => {
-        const onAbort = () => {
-          this.worker.postMessage({ type: 'ABORT', id: reqId });
-          reject(new Error('Move generation aborted'));
-          this.pendingRequests.delete(reqId);
-        };
+    if (this.worker && !this.workerFailed) {
+      try {
+        const reqId = this._nextId();
+        return await new Promise((resolve, reject) => {
+          const onAbort = () => {
+            if (this.worker) this.worker.postMessage({ type: 'ABORT', id: reqId });
+            reject(new Error('Move generation aborted'));
+            this.pendingRequests.delete(reqId);
+          };
 
-        if (signal) {
-          if (signal.aborted) return reject(new Error('Move generation aborted'));
-          signal.addEventListener('abort', onAbort, { once: true });
+          if (signal) {
+            if (signal.aborted) return reject(new Error('Move generation aborted'));
+            signal.addEventListener('abort', onAbort, { once: true });
+          }
+
+          this.pendingRequests.set(reqId, {
+            resolve: (val) => {
+              if (signal) signal.removeEventListener('abort', onAbort);
+              resolve(val);
+            },
+            reject: (err) => {
+              if (signal) signal.removeEventListener('abort', onAbort);
+              reject(err);
+            }
+          });
+
+          this.worker.postMessage({
+            type: 'GENERATE_MOVE',
+            id: reqId,
+            payload: {
+              board: Array.from(board),
+              turn,
+              mustContinueJumpFrom,
+              legalMoves,
+              tacticalMode,
+              personaId,
+              evaluatedCandidates
+            }
+          });
+        });
+      } catch (workerErr) {
+        console.warn('[LLMWorkerBridge] Worker move generation failed, falling back to in-process:', workerErr);
+        this.workerFailed = true;
+        if (this.worker) {
+          try { this.worker.terminate(); } catch (_) {}
+          this.worker = null;
         }
-
-        this.pendingRequests.set(reqId, {
-          resolve: (val) => {
-            if (signal) signal.removeEventListener('abort', onAbort);
-            resolve(val);
-          },
-          reject: (err) => {
-            if (signal) signal.removeEventListener('abort', onAbort);
-            reject(err);
-          }
-        });
-
-        this.worker.postMessage({
-          type: 'GENERATE_MOVE',
-          id: reqId,
-          payload: {
-            board: Array.from(board),
-            turn,
-            mustContinueJumpFrom,
-            legalMoves,
-            tacticalMode,
-            personaId,
-            evaluatedCandidates
-          }
-        });
-      });
+        return await this._generateMoveInProcess(params);
+      }
     }
 
     // In-process fallback execution
@@ -551,49 +577,59 @@ export class LLMWorkerBridge {
       this._ensureWorker();
     }
 
-    if (this.worker) {
-      const reqId = this._nextId();
-      return await new Promise((resolve, reject) => {
-        const onAbort = () => {
-          this.worker.postMessage({ type: 'ABORT', id: reqId });
-          reject(new Error('Banter streaming aborted'));
-          this.pendingRequests.delete(reqId);
-          this.streamListeners.delete(reqId);
-        };
+    if (this.worker && !this.workerFailed) {
+      try {
+        const reqId = this._nextId();
+        return await new Promise((resolve, reject) => {
+          const onAbort = () => {
+            if (this.worker) this.worker.postMessage({ type: 'ABORT', id: reqId });
+            reject(new Error('Banter streaming aborted'));
+            this.pendingRequests.delete(reqId);
+            this.streamListeners.delete(reqId);
+          };
 
-        if (signal) {
-          if (signal.aborted) return reject(new Error('Banter streaming aborted'));
-          signal.addEventListener('abort', onAbort, { once: true });
-        }
-
-        if (onToken) {
-          this.streamListeners.set(reqId, onToken);
-        }
-
-        this.pendingRequests.set(reqId, {
-          resolve: (text) => {
-            if (signal) signal.removeEventListener('abort', onAbort);
-            resolve(text);
-          },
-          reject: (err) => {
-            if (signal) signal.removeEventListener('abort', onAbort);
-            reject(err);
+          if (signal) {
+            if (signal.aborted) return reject(new Error('Banter streaming aborted'));
+            signal.addEventListener('abort', onAbort, { once: true });
           }
-        });
 
-        this.worker.postMessage({
-          type: 'STREAM_BANTER',
-          id: reqId,
-          payload: {
-            persona,
-            move,
-            board: Array.from(board),
-            turn,
-            crowned,
-            opponentBanter
+          if (onToken) {
+            this.streamListeners.set(reqId, onToken);
           }
+
+          this.pendingRequests.set(reqId, {
+            resolve: (text) => {
+              if (signal) signal.removeEventListener('abort', onAbort);
+              resolve(text);
+            },
+            reject: (err) => {
+              if (signal) signal.removeEventListener('abort', onAbort);
+              reject(err);
+            }
+          });
+
+          this.worker.postMessage({
+            type: 'STREAM_BANTER',
+            id: reqId,
+            payload: {
+              persona,
+              move,
+              board: Array.from(board),
+              turn,
+              crowned,
+              opponentBanter
+            }
+          });
         });
-      });
+      } catch (workerErr) {
+        console.warn('[LLMWorkerBridge] Worker banter stream failed, falling back to in-process:', workerErr);
+        this.workerFailed = true;
+        if (this.worker) {
+          try { this.worker.terminate(); } catch (_) {}
+          this.worker = null;
+        }
+        return await this._streamBanterInProcess(params);
+      }
     }
 
     // In-process fallback banter

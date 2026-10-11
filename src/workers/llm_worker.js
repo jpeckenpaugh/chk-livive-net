@@ -16,6 +16,33 @@ const WEBLLM_CDN_URLS = [
   'https://esm.sh/@mlc-ai/web-llm@0.2.85'
 ];
 
+// Provide worker polyfills for browser environments where WebLLM expects window/DOM
+if (typeof self !== 'undefined') {
+  if (typeof self.window === 'undefined') {
+    self.window = self;
+  }
+  self.addEventListener('error', (event) => {
+    console.error('[llm_worker] Worker uncaught error:', event.message || event, event.filename, event.lineno, event.error);
+    try {
+      self.postMessage({
+        type: 'ERROR',
+        id: 'global_worker_error',
+        payload: { error: event.message || 'Worker uncaught error' }
+      });
+    } catch (_) {}
+  });
+  self.addEventListener('unhandledrejection', (event) => {
+    console.error('[llm_worker] Worker unhandled promise rejection:', event.reason);
+    try {
+      self.postMessage({
+        type: 'ERROR',
+        id: 'global_worker_error',
+        payload: { error: event.reason?.message || String(event.reason) || 'Worker unhandled rejection' }
+      });
+    } catch (_) {}
+  });
+}
+
 let engine = null;
 let currentModelId = null;
 let currentAbortController = null;
