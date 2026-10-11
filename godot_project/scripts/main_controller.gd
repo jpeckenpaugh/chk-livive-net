@@ -15,9 +15,9 @@ extends Node3D
 @onready var game_over_modal: Control = $UI/GameOverModal
 
 func _ready() -> void:
-	# Orient camera to look directly at center of board
+	# Orient camera to look at the board center with slight forward bias to clear top HUD
 	if camera != null:
-		camera.look_at(Vector3.ZERO, Vector3.UP)
+		camera.look_at(Vector3(0, 0, -0.4), Vector3.UP)
 
 	# Connect Autoload Bridge signals
 	if Bridge != null:

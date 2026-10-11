@@ -405,6 +405,13 @@ const engine = new Engine(GODOT_CONFIG);
 			}
 		};
 
+		// If Godot was already connected and registered its hooks before this module finished importing:
+		if (window.GodotCheckersBridge && window.GodotCheckersBridge._onGodotRender && !controller._godotInitialized) {
+			console.log('[Godot 3D Shell] Godot was already connected. Initializing CheckersController immediately...');
+			controller._godotInitialized = true;
+			controller.init();
+		}
+
 		window.__checkers = {
 			adapter,
 			controller

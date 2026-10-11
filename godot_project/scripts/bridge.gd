@@ -36,10 +36,11 @@ func _ready() -> void:
 		_setup_mock_mode()
 
 func _setup_web_bridge() -> void:
-	_js_bridge = JavaScriptBridge.get_interface("GodotCheckersBridge")
+	_js_bridge = JavaScriptBridge.eval("window.GodotCheckersBridge")
 	if _js_bridge == null:
-		print("[Bridge] Warning: 'window.GodotCheckersBridge' not detected. Falling back to Mock Mode.")
-		_setup_mock_mode()
+		print("[Bridge] Waiting for window.GodotCheckersBridge to initialize...")
+		var t = get_tree().create_timer(0.05)
+		t.timeout.connect(_setup_web_bridge)
 		return
 
 	print("[Bridge] Web client connected to JavaScript bridge. Registering callbacks...")
@@ -64,15 +65,15 @@ func _setup_web_bridge() -> void:
 	_js_bridge["_onGodotShowNotation"] = _cb_show_notation
 	_js_bridge["_onGodotDownloadProgress"] = _cb_download_progress
 
-	# Notify JS that Godot is ready
-	if _js_bridge.has("onGodotReady") and _js_bridge["onGodotReady"] != null:
-		_js_bridge.onGodotReady()
+	# Notify JS that Godot is ready to receive render data
+	JavaScriptBridge.eval("if (window.GodotCheckersBridge && typeof window.GodotCheckersBridge.onGodotReady === 'function') window.GodotCheckersBridge.onGodotReady();")
 
 func _setup_mock_mode() -> void:
 	is_mock_mode = true
 	print("[Bridge] Initialized in Mock Mode (Desktop / Editor environment).")
 	# Emit sample initial board state after short delay for desktop editor preview
-	call_deferred("_emit_mock_initial_state")
+	var t = get_tree().create_timer(0.2)
+	t.timeout.connect(_emit_mock_initial_state)
 
 func _emit_mock_initial_state() -> void:
 	# Standard Draughts opening board (12 black pieces, 8 empty, 12 red pieces)
