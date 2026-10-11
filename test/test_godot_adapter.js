@@ -263,3 +263,60 @@ test('GodotAdapter - Dummy DOM objects absorb property writes and method calls s
 
   assert.ok(adapter.arenaFeedList.textContent.includes('Good move!'));
 });
+
+test('GodotAdapter - Wiring controller actions: launchMatch, resetGame, spectatorAction, godotReady', async (t) => {
+  const adapter = new GodotAdapter();
+  const controller = new CheckersController(adapter);
+  adapter.setController(controller);
+
+  const root = typeof window !== 'undefined' ? window : globalThis;
+
+  // 1. onGodotReady triggers init
+  assert.equal(controller._godotInitialized, undefined);
+  root.GodotCheckersBridge.onGodotReady();
+  assert.equal(controller._godotInitialized, true);
+
+  // 2. onResetGame triggers controller.resetGame
+  let resetCalled = false;
+  const originalReset = controller.resetGame.bind(controller);
+  controller.resetGame = () => {
+    resetCalled = true;
+    originalReset();
+  };
+  root.GodotCheckersBridge.onResetGame();
+  assert.equal(resetCalled, true);
+
+  // 3. onLaunchMatch triggers controller.launchMatch
+  let launchConfig = null;
+  controller.launchMatch = async (cfg) => {
+    launchConfig = cfg;
+  };
+  root.GodotCheckersBridge.onLaunchMatch(JSON.stringify({ mode: 'pvp' }));
+  assert.deepEqual(launchConfig, { mode: 'pvp' });
+
+  // 4. onSpectatorAction triggers spectator controls
+  let playCalled = false;
+  let pauseCalled = false;
+  let stepCalled = false;
+  controller.spectatorPlay = () => { playCalled = true; };
+  controller.spectatorPause = () => { pauseCalled = true; };
+  controller.spectatorStep = () => { stepCalled = true; };
+
+  root.GodotCheckersBridge.onSpectatorAction('play');
+  assert.equal(playCalled, true);
+
+  root.GodotCheckersBridge.onSpectatorAction('pause');
+  assert.equal(pauseCalled, true);
+
+  root.GodotCheckersBridge.onSpectatorAction('step');
+  assert.equal(stepCalled, true);
+
+  root.GodotCheckersBridge.onSpectatorAction('speed', '500');
+  assert.equal(controller.spectatorSpeed, 500);
+
+  // 5. Flip, notation, and mute toggles
+  root.GodotCheckersBridge.onMuted(true);
+  assert.equal(adapter.sound.muted, true);
+  root.GodotCheckersBridge.onMuted(false);
+  assert.equal(adapter.sound.muted, false);
+});

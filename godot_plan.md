@@ -93,7 +93,7 @@ Build an alternate, 3D Web frontend for **English Draughts (Checkers)** using **
   3. **Spectator Controls**: Arena playback bar (Play, Pause, Step Move, Speed slider) and active feed.
   4. **3D Banter Speech Bubbles**: Billboarded 3D callouts hovering above the board streaming real-time tokens from WebLLM personas.
   5. **Game Over Modal**: Victory/draw fanfare, match stats (turns, time, captures, kings), and rematch controls.
-- **Status:** `[PENDING]`
+- **Status:** `[COMPLETED]`
 
 ### **Section 5: Verification, Polish, Documentation & Release**
 - **Goal:** Comprehensive end-to-end testing across all modes, zero-regression verification, documentation, and git synchronization.

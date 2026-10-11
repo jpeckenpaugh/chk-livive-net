@@ -393,10 +393,16 @@ const engine = new Engine(GODOT_CONFIG);
 
 		const adapter = new GodotAdapter();
 		const controller = new CheckersController(adapter);
+		adapter.setController(controller);
 
 		window.GodotCheckersBridge.onGodotReady = () => {
 			console.log('[Godot 3D Shell] Godot reported onGodotReady. Initializing CheckersController...');
-			controller.init();
+			if (!controller._godotInitialized) {
+				controller._godotInitialized = true;
+				controller.init();
+			} else {
+				controller.updateView();
+			}
 		};
 
 		window.__checkers = {

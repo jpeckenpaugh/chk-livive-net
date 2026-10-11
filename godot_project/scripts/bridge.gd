@@ -218,3 +218,32 @@ func notify_spectator_action(action: String, value: Variant = null) -> void:
 
 	if _js_bridge and _js_bridge.has("onSpectatorAction") and _js_bridge["onSpectatorAction"] != null:
 		_js_bridge.onSpectatorAction(action, value)
+
+## Notifies board flip toggle
+func notify_board_flipped(flipped: bool) -> void:
+	board_flipped.emit(flipped)
+	if is_mock_mode:
+		print("[Bridge Mock] Board flipped: ", flipped)
+		return
+
+	if _js_bridge and _js_bridge.has("onBoardFlipped") and _js_bridge["onBoardFlipped"] != null:
+		_js_bridge.onBoardFlipped(flipped)
+
+## Notifies notation numbers toggle
+func notify_show_notation(show: bool) -> void:
+	show_notation_changed.emit(show)
+	if is_mock_mode:
+		print("[Bridge Mock] Show notation: ", show)
+		return
+
+	if _js_bridge and _js_bridge.has("onShowNotation") and _js_bridge["onShowNotation"] != null:
+		_js_bridge.onShowNotation(show)
+
+## Notifies sound muted toggle
+func notify_muted(muted: bool) -> void:
+	if is_mock_mode:
+		print("[Bridge Mock] Sound muted: ", muted)
+		return
+
+	if _js_bridge and _js_bridge.has("onMuted") and _js_bridge["onMuted"] != null:
+		_js_bridge.onMuted(muted)

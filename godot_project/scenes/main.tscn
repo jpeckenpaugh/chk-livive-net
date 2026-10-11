@@ -1,7 +1,12 @@
-[gd_scene load_steps=8 format=3 uid="uid://b8t5k2m8e7y1"]
+[gd_scene load_steps=13 format=3 uid="uid://b8t5k2m8e7y1"]
 
 [ext_resource type="Script" path="res://scripts/main_controller.gd" id="1_main"]
-[ext_resource type="PackedScene" uid="uid://b7dq4board001" path="res://scenes/board.tscn" id="2_board"]
+[ext_resource type="PackedScene" path="res://scenes/board.tscn" id="2_board"]
+[ext_resource type="PackedScene" path="res://scenes/hud.tscn" id="3_hud"]
+[ext_resource type="PackedScene" path="res://scenes/spectator_bar.tscn" id="4_spec"]
+[ext_resource type="PackedScene" path="res://scenes/mode_select.tscn" id="5_mode"]
+[ext_resource type="PackedScene" path="res://scenes/preload_staging.tscn" id="6_preload"]
+[ext_resource type="PackedScene" path="res://scenes/game_over_modal.tscn" id="7_gameover"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
 sky_top_color = Color(0.18, 0.2, 0.24, 1)
@@ -53,3 +58,18 @@ mesh = SubResource("BoxMesh_pedestal")
 surface_material_override/0 = SubResource("StandardMaterial3D_pedestal")
 
 [node name="Board" parent="." instance=ExtResource("2_board")]
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="HUD" parent="UI" instance=ExtResource("3_hud")]
+
+[node name="SpectatorBar" parent="UI" instance=ExtResource("4_spec")]
+visible = false
+
+[node name="ModeSelect" parent="UI" instance=ExtResource("5_mode")]
+
+[node name="PreloadStaging" parent="UI" instance=ExtResource("6_preload")]
+visible = false
+
+[node name="GameOverModal" parent="UI" instance=ExtResource("7_gameover")]
+visible = false

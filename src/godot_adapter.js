@@ -357,7 +357,7 @@ export class GodotAdapter {
 
         // Godot -> JS callbacks
         onGodotReady: () => {
-          console.log('[GodotCheckersBridge] Godot ready received');
+          this._handleGodotReady();
         },
         onSquareClicked: (index) => {
           this.triggerSquareClick(index);
@@ -366,13 +366,22 @@ export class GodotAdapter {
           this._handleAnimationComplete();
         },
         onLaunchMatch: (configJson) => {
-          console.log('[GodotCheckersBridge] onLaunchMatch received:', configJson);
+          this._handleLaunchMatch(configJson);
         },
         onResetGame: () => {
-          console.log('[GodotCheckersBridge] onResetGame received');
+          this._handleResetGame();
         },
         onSpectatorAction: (action, value) => {
-          console.log('[GodotCheckersBridge] onSpectatorAction:', action, value);
+          this._handleSpectatorAction(action, value);
+        },
+        onBoardFlipped: (flipped) => {
+          this.setBoardFlipped(flipped);
+        },
+        onShowNotation: (show) => {
+          this.setShowNotation(show);
+        },
+        onMuted: (muted) => {
+          this.setMuted(muted);
         }
       };
     } else {
@@ -389,9 +398,112 @@ export class GodotAdapter {
         this._handleAnimationComplete();
         if (typeof prevOnAnimationComplete === 'function') prevOnAnimationComplete();
       };
+
+      const prevOnLaunchMatch = existing.onLaunchMatch;
+      existing.onLaunchMatch = (configJson) => {
+        this._handleLaunchMatch(configJson);
+        if (typeof prevOnLaunchMatch === 'function') prevOnLaunchMatch(configJson);
+      };
+
+      const prevOnResetGame = existing.onResetGame;
+      existing.onResetGame = () => {
+        this._handleResetGame();
+        if (typeof prevOnResetGame === 'function') prevOnResetGame();
+      };
+
+      const prevOnSpectatorAction = existing.onSpectatorAction;
+      existing.onSpectatorAction = (action, value) => {
+        this._handleSpectatorAction(action, value);
+        if (typeof prevOnSpectatorAction === 'function') prevOnSpectatorAction(action, value);
+      };
+
+      const prevOnGodotReady = existing.onGodotReady;
+      existing.onGodotReady = () => {
+        this._handleGodotReady();
+        if (typeof prevOnGodotReady === 'function') prevOnGodotReady();
+      };
+
+      existing.onBoardFlipped = (flipped) => {
+        this.setBoardFlipped(flipped);
+      };
+      existing.onShowNotation = (show) => {
+        this.setShowNotation(show);
+      };
+      existing.onMuted = (muted) => {
+        this.setMuted(muted);
+      };
     }
 
     return root.GodotCheckersBridge;
+  }
+
+  /**
+   * Binds the CheckersController instance to the adapter.
+   * @param {import('./controller.js').CheckersController} controller
+   */
+  setController(controller) {
+    this.controller = controller;
+  }
+
+  /**
+   * Handles launch match request from Godot UI
+   * @param {string|Object} configJson
+   * @private
+   */
+  _handleLaunchMatch(configJson) {
+    try {
+      const config = typeof configJson === 'string' ? JSON.parse(configJson) : (configJson || {});
+      if (this.controller && typeof this.controller.launchMatch === 'function') {
+        this.controller.launchMatch(config);
+      }
+    } catch (e) {
+      console.error('[GodotAdapter] Error parsing launch match config:', e);
+    }
+  }
+
+  /**
+   * Handles reset match request from Godot UI
+   * @private
+   */
+  _handleResetGame() {
+    if (this.controller && typeof this.controller.resetGame === 'function') {
+      this.controller.resetGame();
+    }
+  }
+
+  /**
+   * Handles spectator action request from Godot UI
+   * @param {string} action
+   * @param {any} value
+   * @private
+   */
+  _handleSpectatorAction(action, value) {
+    if (!this.controller) return;
+    if (action === 'play') {
+      this.controller.spectatorPlay();
+    } else if (action === 'pause') {
+      this.controller.spectatorPause();
+    } else if (action === 'step') {
+      this.controller.spectatorStep();
+    } else if (action === 'speed') {
+      this.controller.spectatorSpeed = Number(value);
+    }
+  }
+
+  /**
+   * Handles Godot ready signal
+   * @private
+   */
+  _handleGodotReady() {
+    console.log('[GodotCheckersBridge] Godot ready received');
+    if (this.controller) {
+      if (!this.controller._godotInitialized) {
+        this.controller._godotInitialized = true;
+        this.controller.init();
+      } else {
+        this.controller.updateView();
+      }
+    }
   }
 
   /**

@@ -2,11 +2,17 @@ extends Node3D
 
 ## MainController
 ## Coordinates 3D Scene components, Camera Gimbal/Pivot, Lighting,
-## and connects Autoload Bridge signals to BoardView.
+## connects Autoload Bridge signals to BoardView, and wires 2D UI views.
 
 @onready var camera_pivot: Node3D = $CameraPivot
 @onready var camera: Camera3D = $CameraPivot/Camera3D
 @onready var board: Node3D = $Board
+
+@onready var hud: Control = $UI/HUD
+@onready var spectator_bar: Control = $UI/SpectatorBar
+@onready var mode_select: Control = $UI/ModeSelect
+@onready var preload_staging: Control = $UI/PreloadStaging
+@onready var game_over_modal: Control = $UI/GameOverModal
 
 func _ready() -> void:
 	# Orient camera to look directly at center of board
@@ -20,7 +26,37 @@ func _ready() -> void:
 		Bridge.board_flipped.connect(_on_board_flipped)
 		Bridge.show_notation_changed.connect(_on_show_notation_changed)
 
+	# Wire UI navigation signals
+	if hud != null:
+		hud.open_mode_select_requested.connect(_on_open_mode_select)
+		hud.reopen_game_over_requested.connect(_on_reopen_game_over)
+
+	if game_over_modal != null:
+		game_over_modal.open_mode_select_requested.connect(_on_open_mode_select)
+		game_over_modal.review_board_requested.connect(_on_review_board)
+
+	if mode_select != null:
+		mode_select.match_launched.connect(_on_match_launched)
+
 	print("[MainController] Checkers 3D scene initialized and ready.")
+
+func _on_open_mode_select() -> void:
+	if mode_select != null:
+		mode_select.visible = true
+
+func _on_match_launched(_config: Dictionary) -> void:
+	if hud != null:
+		hud.show_recap_button(false)
+	if game_over_modal != null:
+		game_over_modal.visible = false
+
+func _on_review_board() -> void:
+	if hud != null:
+		hud.show_recap_button(true)
+
+func _on_reopen_game_over() -> void:
+	if game_over_modal != null and game_over_modal.has_method("reopen"):
+		game_over_modal.reopen()
 
 func _on_board_updated(data: Dictionary) -> void:
 	if board != null and board.has_method("on_board_updated"):

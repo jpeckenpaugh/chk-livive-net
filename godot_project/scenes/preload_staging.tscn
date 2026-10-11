@@ -1,0 +1,124 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/preload_staging_view.gd" id="1_preload"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_preload_card"]
+bg_color = Color(0.14, 0.12, 0.11, 0.98)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.96, 0.69, 0.25, 0.8)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_size = 12
+shadow_color = Color(0, 0, 0, 0.7)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_progress_fill"]
+bg_color = Color(0.96, 0.69, 0.25, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_progress_bg"]
+bg_color = Color(0.08, 0.08, 0.09, 0.8)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="PreloadStaging" type="Control"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_preload")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.7)
+
+[node name="Card" type="PanelContainer" parent="Backdrop"]
+custom_minimum_size = Vector2(460, 260)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -230.0
+offset_top = -130.0
+offset_right = 230.0
+offset_bottom = 130.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_preload_card")
+
+[node name="Margin" type="MarginContainer" parent="Backdrop/Card"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+
+[node name="VBox" type="VBoxContainer" parent="Backdrop/Card/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="Title" type="Label" parent="Backdrop/Card/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.69, 0.25, 1)
+theme_override_font_sizes/font_size = 16
+text = "🧠 NEURAL MODEL PREPARATION"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="Backdrop/Card/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.7, 0.65, 1)
+theme_override_font_sizes/font_size = 12
+text = "Downloading neural weights for local browser inference..."
+horizontal_alignment = 1
+
+[node name="ProgressBar" type="ProgressBar" parent="Backdrop/Card/Margin/VBox"]
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_progress_bg")
+theme_override_styles/fill = SubResource("StyleBoxFlat_progress_fill")
+show_percentage = false
+
+[node name="ProgressInfo" type="HBoxContainer" parent="Backdrop/Card/Margin/VBox"]
+layout_mode = 2
+
+[node name="StatusLabel" type="Label" parent="Backdrop/Card/Margin/VBox/ProgressInfo"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.8, 0.75, 1)
+theme_override_font_sizes/font_size = 11
+text = "Connecting to repository..."
+
+[node name="PercentLabel" type="Label" parent="Backdrop/Card/Margin/VBox/ProgressInfo"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.69, 0.25, 1)
+theme_override_font_sizes/font_size = 11
+text = "0%"
+
+[node name="Spacer" type="Control" parent="Backdrop/Card/Margin/VBox"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="BtnFallbackMinimax" type="Button" parent="Backdrop/Card/Margin/VBox"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+text = "⚡ Switch to Minimax (Instant Play)"

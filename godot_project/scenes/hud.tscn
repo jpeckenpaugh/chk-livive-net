@@ -1,0 +1,379 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/hud_view.gd" id="1_hud"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card_red"]
+bg_color = Color(0.14, 0.12, 0.11, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.35, 0.3, 0.26, 0.6)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_size = 4
+shadow_color = Color(0, 0, 0, 0.4)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card_black"]
+bg_color = Color(0.14, 0.12, 0.11, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.35, 0.3, 0.26, 0.6)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_size = 4
+shadow_color = Color(0, 0, 0, 0.4)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_capsule"]
+bg_color = Color(0.12, 0.1, 0.09, 0.92)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.96, 0.69, 0.25, 0.5)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+shadow_size = 4
+shadow_color = Color(0, 0, 0, 0.3)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bubble"]
+bg_color = Color(0.16, 0.14, 0.12, 0.95)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.96, 0.69, 0.25, 0.7)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_size = 6
+shadow_color = Color(0, 0, 0, 0.5)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_jump_pill"]
+bg_color = Color(0.85, 0.2, 0.15, 0.95)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.6, 0.5, 0.9)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[node name="HUD" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_hud")
+
+[node name="TopBar" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 16.0
+offset_top = 56.0
+offset_right = -16.0
+offset_bottom = 116.0
+grow_horizontal = 2
+mouse_filter = 2
+
+[node name="PlayerRedCard" type="PanelContainer" parent="TopBar"]
+custom_minimum_size = Vector2(210, 56)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_card_red")
+
+[node name="Margin" type="MarginContainer" parent="TopBar/PlayerRedCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 6
+
+[node name="HBox" type="HBoxContainer" parent="TopBar/PlayerRedCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Avatar" type="Label" parent="TopBar/PlayerRedCard/Margin/HBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "🔴"
+
+[node name="VBox" type="VBoxContainer" parent="TopBar/PlayerRedCard/Margin/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Name" type="Label" parent="TopBar/PlayerRedCard/Margin/HBox/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.93, 0.88, 1)
+theme_override_font_sizes/font_size = 13
+text = "Red (Player)"
+
+[node name="Pieces" type="Label" parent="TopBar/PlayerRedCard/Margin/HBox/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.7, 0.65, 1)
+theme_override_font_sizes/font_size = 11
+text = "12 pieces"
+
+[node name="Kings" type="Label" parent="TopBar/PlayerRedCard/Margin/HBox/VBox"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.69, 0.25, 1)
+theme_override_font_sizes/font_size = 11
+text = "👑 0"
+
+[node name="SpacerLeft" type="Control" parent="TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="TurnCapsule" type="PanelContainer" parent="TopBar"]
+custom_minimum_size = Vector2(170, 38)
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_styles/panel = SubResource("StyleBoxFlat_capsule")
+
+[node name="Margin" type="MarginContainer" parent="TopBar/TurnCapsule"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 4
+
+[node name="HBox" type="HBoxContainer" parent="TopBar/TurnCapsule/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="TurnDot" type="ColorRect" parent="TopBar/TurnCapsule/Margin/HBox"]
+custom_minimum_size = Vector2(10, 10)
+layout_mode = 2
+size_flags_vertical = 4
+color = Color(0.91, 0.3, 0.24, 1)
+
+[node name="TurnLabel" type="Label" parent="TopBar/TurnCapsule/Margin/HBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.93, 0.88, 1)
+theme_override_font_sizes/font_size = 13
+text = "Red's Turn"
+
+[node name="SpacerRight" type="Control" parent="TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="PlayerBlackCard" type="PanelContainer" parent="TopBar"]
+custom_minimum_size = Vector2(210, 56)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_card_black")
+
+[node name="Margin" type="MarginContainer" parent="TopBar/PlayerBlackCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 6
+
+[node name="HBox" type="HBoxContainer" parent="TopBar/PlayerBlackCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Avatar" type="Label" parent="TopBar/PlayerBlackCard/Margin/HBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "⚫"
+
+[node name="VBox" type="VBoxContainer" parent="TopBar/PlayerBlackCard/Margin/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Name" type="Label" parent="TopBar/PlayerBlackCard/Margin/HBox/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.93, 0.88, 1)
+theme_override_font_sizes/font_size = 13
+text = "Black (Opponent)"
+
+[node name="Pieces" type="Label" parent="TopBar/PlayerBlackCard/Margin/HBox/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.7, 0.65, 1)
+theme_override_font_sizes/font_size = 11
+text = "12 pieces"
+
+[node name="Kings" type="Label" parent="TopBar/PlayerBlackCard/Margin/HBox/VBox"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.69, 0.25, 1)
+theme_override_font_sizes/font_size = 11
+text = "👑 0"
+
+[node name="JumpAlert" type="PanelContainer" parent="."]
+visible = false
+custom_minimum_size = Vector2(180, 30)
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -90.0
+offset_top = 118.0
+offset_right = 90.0
+offset_bottom = 148.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_jump_pill")
+
+[node name="Margin" type="MarginContainer" parent="JumpAlert"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 2
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 2
+
+[node name="Label" type="Label" parent="JumpAlert/Margin"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "⚠️ MANDATORY JUMP!"
+horizontal_alignment = 1
+
+[node name="BanterContainer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="SpeechBubbleRed" type="PanelContainer" parent="BanterContainer"]
+visible = false
+custom_minimum_size = Vector2(240, 0)
+layout_mode = 1
+offset_left = 16.0
+offset_top = 122.0
+offset_right = 266.0
+offset_bottom = 186.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_bubble")
+
+[node name="Margin" type="MarginContainer" parent="BanterContainer/SpeechBubbleRed"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="VBox" type="VBoxContainer" parent="BanterContainer/SpeechBubbleRed/Margin"]
+layout_mode = 2
+
+[node name="Header" type="Label" parent="BanterContainer/SpeechBubbleRed/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.69, 0.25, 1)
+theme_override_font_sizes/font_size = 10
+text = "💬 BANTER ▼"
+
+[node name="TextLabel" type="Label" parent="BanterContainer/SpeechBubbleRed/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.93, 0.88, 1)
+theme_override_font_sizes/font_size = 12
+text = "Ahoy! Let's see what moves ye have!"
+autowrap_mode = 2
+
+[node name="SpeechBubbleBlack" type="PanelContainer" parent="BanterContainer"]
+visible = false
+custom_minimum_size = Vector2(240, 0)
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -266.0
+offset_top = 122.0
+offset_right = -16.0
+offset_bottom = 186.0
+grow_horizontal = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_bubble")
+
+[node name="Margin" type="MarginContainer" parent="BanterContainer/SpeechBubbleBlack"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="VBox" type="VBoxContainer" parent="BanterContainer/SpeechBubbleBlack/Margin"]
+layout_mode = 2
+
+[node name="Header" type="Label" parent="BanterContainer/SpeechBubbleBlack/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.69, 0.25, 1)
+theme_override_font_sizes/font_size = 10
+text = "💬 BANTER ▼"
+horizontal_alignment = 2
+
+[node name="TextLabel" type="Label" parent="BanterContainer/SpeechBubbleBlack/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.93, 0.88, 1)
+theme_override_font_sizes/font_size = 12
+text = "An intriguing move indeed, my good sir."
+autowrap_mode = 2
+
+[node name="Toolbar" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -520.0
+offset_top = -54.0
+offset_right = -16.0
+offset_bottom = -14.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_capsule")
+
+[node name="Margin" type="MarginContainer" parent="Toolbar"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 4
+
+[node name="HBox" type="HBoxContainer" parent="Toolbar/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="BtnFlip" type="Button" parent="Toolbar/Margin/HBox"]
+layout_mode = 2
+text = "🔄 Flip"
+
+[node name="BtnNotation" type="Button" parent="Toolbar/Margin/HBox"]
+layout_mode = 2
+text = "🔢 Notation"
+
+[node name="BtnMute" type="Button" parent="Toolbar/Margin/HBox"]
+layout_mode = 2
+text = "🔊 Sound"
+
+[node name="BtnReset" type="Button" parent="Toolbar/Margin/HBox"]
+layout_mode = 2
+text = "↺ Reset"
+
+[node name="BtnMenu" type="Button" parent="Toolbar/Margin/HBox"]
+layout_mode = 2
+text = "☰ Modes"
+
+[node name="BtnRecap" type="Button" parent="Toolbar/Margin/HBox"]
+visible = false
+layout_mode = 2
+text = "🏆 View Recap"
