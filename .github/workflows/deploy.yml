@@ -65,10 +65,7 @@ jobs:
 
       - name: Build Godot 3D Web Client
         run: |
-          mkdir -p godot
-          godot --headless --path godot_project --export-release "Web" ../godot/index.html
-          echo "Verified Godot artifacts:"
-          ls -lh godot/
+          bash scripts/build_godot.sh
 
       - name: Assemble GitHub Pages Distribution
         run: |

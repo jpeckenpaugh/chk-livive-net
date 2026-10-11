@@ -33,8 +33,27 @@ echo "Godot Version: $GODOT_VERSION"
 DEST_DIR="$REPO_ROOT/godot"
 mkdir -p "$DEST_DIR"
 
+BUILD_ID="$(git rev-parse --short HEAD 2>/dev/null || date +%s)"
+echo "Build Version ID: $BUILD_ID"
+
 echo "Exporting Web target to: $DEST_DIR/index.html"
 "$GODOT_BIN" --headless --path "$REPO_ROOT/godot_project" --export-release "Web" "$DEST_DIR/index.html"
+
+# Apply cache-busting stamping
+echo ""
+echo "=== Cache-Busting Pipeline ==="
+node -e '
+  const fs = require("fs");
+  const filePath = process.argv[1];
+  const buildId = process.argv[2];
+  let content = fs.readFileSync(filePath, "utf8");
+  content = content.replace(/BUILD_HASH_PLACEHOLDER/g, buildId);
+  content = content.replace(/<script src="index\.js"><\/script>/g, `<script src="index.js?v=${buildId}"><\/script>`);
+  content = content.replace(/\.\.\/src\/controller\.js/g, `../src/controller.js?v=${buildId}`);
+  content = content.replace(/\.\.\/src\/godot_adapter\.js/g, `../src/godot_adapter.js?v=${buildId}`);
+  fs.writeFileSync(filePath, content, "utf8");
+  console.log(`Cache-busting stamps (?v=${buildId}) successfully applied to ${filePath}`);
+' "$DEST_DIR/index.html" "$BUILD_ID"
 
 # Verify generated artifacts
 EXPECTED_FILES=("index.html" "index.js" "index.wasm" "index.pck")

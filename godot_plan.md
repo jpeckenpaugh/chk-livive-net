@@ -83,7 +83,7 @@ Build an alternate, 3D Web frontend for **English Draughts (Checkers)** using **
      - Regular slides: smooth linear/quadratic translation.
      - Jumps: parabolic 3D arc over captured pieces.
      - Captures: piece scale-down and dissipation.
-- **Status:** `[PENDING]`
+- **Status:** `[COMPLETED]`
 
 ### **Section 4: Menus, HUD & Persona Banter Integration**
 - **Goal:** Build the UI layer and LLM personality presentation inside the 3D frontend.

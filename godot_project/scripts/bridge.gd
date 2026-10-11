@@ -76,10 +76,10 @@ func _setup_mock_mode() -> void:
 
 func _emit_mock_initial_state() -> void:
 	# Standard Draughts opening board (12 black pieces, 8 empty, 12 red pieces)
-	# 1=RED_MAN, 2=BLACK_MAN
+	# 1=RED_MAN, -1=BLACK_MAN
 	var mock_board: Array = []
 	for i in range(12):
-		mock_board.append(2) # Black pieces on rows 0..2
+		mock_board.append(-1) # Black pieces on rows 0..2 (-1 = BLACK_MAN)
 	for i in range(8):
 		mock_board.append(0) # Empty squares on rows 3..4
 	for i in range(12):

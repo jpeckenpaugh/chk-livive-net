@@ -263,6 +263,20 @@
 		<div id="status-notice"></div>
 	</div>
 
+	<!-- Cache-Busting & Asset Interception -->
+	<script>
+		const BUILD_VERSION = "BUILD_HASH_PLACEHOLDER";
+		window.__BUILD_VERSION__ = (BUILD_VERSION !== "BUILD_HASH_PLACEHOLDER") ? BUILD_VERSION : Date.now().toString(36);
+		const _nativeFetch = window.fetch;
+		window.fetch = function(resource, init) {
+			if (typeof resource === 'string' && (resource.endsWith('.wasm') || resource.endsWith('.pck') || resource.includes('.worklet.js'))) {
+				const sep = resource.includes('?') ? '&' : '?';
+				resource = `${resource}${sep}v=${window.__BUILD_VERSION__}`;
+			}
+			return _nativeFetch.call(this, resource, init);
+		};
+	</script>
+
 	<!-- Godot Engine Loader & Boot Script -->
 	<script src="$GODOT_URL"></script>
 	<script>
