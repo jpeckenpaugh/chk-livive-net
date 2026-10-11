@@ -183,27 +183,27 @@ func _create_theme_materials(theme_id: String) -> Dictionary:
 			# Board Light: Polished white Carrara marble
 			var mat_light = StandardMaterial3D.new()
 			mat_light.albedo_color = Color(0.95, 0.96, 0.97)
-			mat_light.roughness = 0.08
+			mat_light.roughness = 0.14
 			mat_light.metallic = 0.02
 			mat_light.clearcoat_enabled = true
-			mat_light.clearcoat = 1.0
-			mat_light.clearcoat_roughness = 0.05
+			mat_light.clearcoat = 0.9
+			mat_light.clearcoat_roughness = 0.12
 			dict["board_light"] = mat_light
 
 			# Board Dark: Nero Marquina deep black marble
 			var mat_dark = StandardMaterial3D.new()
 			mat_dark.albedo_color = Color(0.08, 0.08, 0.09)
-			mat_dark.roughness = 0.08
+			mat_dark.roughness = 0.14
 			mat_dark.metallic = 0.05
 			mat_dark.clearcoat_enabled = true
-			mat_dark.clearcoat = 1.0
-			mat_dark.clearcoat_roughness = 0.05
+			mat_dark.clearcoat = 0.9
+			mat_dark.clearcoat_roughness = 0.12
 			dict["board_dark"] = mat_dark
 
 			# Board Frame: Slate grey polished stone
 			var mat_frame = StandardMaterial3D.new()
 			mat_frame.albedo_color = Color(0.15, 0.16, 0.19)
-			mat_frame.roughness = 0.15
+			mat_frame.roughness = 0.18
 			mat_frame.metallic = 0.1
 			mat_frame.clearcoat_enabled = true
 			mat_frame.clearcoat = 0.7
@@ -212,30 +212,30 @@ func _create_theme_materials(theme_id: String) -> Dictionary:
 			# Pieces Red: Polished Carrara stone with crimson tone
 			var mat_pred = StandardMaterial3D.new()
 			mat_pred.albedo_color = Color(0.88, 0.25, 0.25)
-			mat_pred.roughness = 0.08
+			mat_pred.roughness = 0.12
 			mat_pred.metallic = 0.05
 			mat_pred.clearcoat_enabled = true
-			mat_pred.clearcoat = 1.0
+			mat_pred.clearcoat = 0.9
 			dict["piece_red"] = mat_pred
 
 			# Pieces Black: Nero Marquina black marble
 			var mat_pblk = StandardMaterial3D.new()
 			mat_pblk.albedo_color = Color(0.06, 0.07, 0.08)
-			mat_pblk.roughness = 0.08
+			mat_pblk.roughness = 0.12
 			mat_pblk.metallic = 0.1
 			mat_pblk.clearcoat_enabled = true
-			mat_pblk.clearcoat = 1.0
+			mat_pblk.clearcoat = 0.9
 			dict["piece_black"] = mat_pblk
 
 			var mat_ared = StandardMaterial3D.new()
 			mat_ared.albedo_color = Color(0.95, 0.96, 0.97)
-			mat_ared.roughness = 0.1
+			mat_ared.roughness = 0.12
 			mat_ared.metallic = 0.2
 			dict["accent_red"] = mat_ared
 
 			var mat_ablk = StandardMaterial3D.new()
 			mat_ablk.albedo_color = Color(0.3, 0.33, 0.38)
-			mat_ablk.roughness = 0.1
+			mat_ablk.roughness = 0.12
 			mat_ablk.metallic = 0.2
 			dict["accent_black"] = mat_ablk
 
@@ -243,70 +243,82 @@ func _create_theme_materials(theme_id: String) -> Dictionary:
 			var mat_crown = StandardMaterial3D.new()
 			mat_crown.albedo_color = Color(0.92, 0.94, 0.98)
 			mat_crown.metallic = 0.95
-			mat_crown.roughness = 0.1
+			mat_crown.roughness = 0.15
 			dict["crown"] = mat_crown
 
 		"glass":
 			# Board Light: Frosted satin-etched glass
 			var mat_light = StandardMaterial3D.new()
-			mat_light.albedo_color = Color(0.65, 0.75, 0.85, 0.65)
+			mat_light.albedo_color = Color(0.72, 0.82, 0.92, 0.7)
 			mat_light.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			mat_light.roughness = 0.28
-			mat_light.metallic = 0.1
+			mat_light.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
+			mat_light.roughness = 0.22
+			mat_light.metallic = 0.05
+			mat_light.clearcoat_enabled = true
+			mat_light.clearcoat = 1.0
 			dict["board_light"] = mat_light
 
 			# Board Dark: Smoky obsidian glass
 			var mat_dark = StandardMaterial3D.new()
-			mat_dark.albedo_color = Color(0.1, 0.11, 0.14, 0.85)
+			mat_dark.albedo_color = Color(0.12, 0.14, 0.18, 0.85)
 			mat_dark.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			mat_dark.roughness = 0.16
-			mat_dark.metallic = 0.15
+			mat_dark.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
+			mat_dark.roughness = 0.18
+			mat_dark.metallic = 0.1
+			mat_dark.clearcoat_enabled = true
+			mat_dark.clearcoat = 1.0
 			dict["board_dark"] = mat_dark
 
-			# Board Frame: Dark smoked acrylic with blue-violet tint
+			# Board Frame: Dark smoked acrylic with blue-violet tint (opaque foundation to prevent depth sorting bugs)
 			var mat_frame = StandardMaterial3D.new()
-			mat_frame.albedo_color = Color(0.09, 0.08, 0.14, 0.92)
-			mat_frame.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			mat_frame.roughness = 0.2
-			mat_frame.metallic = 0.2
+			mat_frame.albedo_color = Color(0.08, 0.08, 0.12)
+			mat_frame.roughness = 0.18
+			mat_frame.metallic = 0.15
+			mat_frame.clearcoat_enabled = true
+			mat_frame.clearcoat = 0.8
 			dict["board_frame"] = mat_frame
 
 			# Pieces Red: Translucent ruby crystal red
 			var mat_pred = StandardMaterial3D.new()
-			mat_pred.albedo_color = Color(0.85, 0.15, 0.22, 0.78)
+			mat_pred.albedo_color = Color(0.9, 0.15, 0.25, 0.82)
 			mat_pred.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			mat_pred.roughness = 0.12
-			mat_pred.metallic = 0.15
+			mat_pred.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
+			mat_pred.roughness = 0.14
+			mat_pred.metallic = 0.1
 			mat_pred.clearcoat_enabled = true
 			mat_pred.clearcoat = 1.0
 			dict["piece_red"] = mat_pred
 
 			# Pieces Black: Smoky obsidian glass
 			var mat_pblk = StandardMaterial3D.new()
-			mat_pblk.albedo_color = Color(0.1, 0.1, 0.13, 0.88)
+			mat_pblk.albedo_color = Color(0.1, 0.12, 0.16, 0.88)
 			mat_pblk.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			mat_pblk.roughness = 0.12
-			mat_pblk.metallic = 0.2
+			mat_pblk.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
+			mat_pblk.roughness = 0.14
+			mat_pblk.metallic = 0.15
 			mat_pblk.clearcoat_enabled = true
 			mat_pblk.clearcoat = 1.0
 			dict["piece_black"] = mat_pblk
 
 			var mat_ared = StandardMaterial3D.new()
-			mat_ared.albedo_color = Color(1.0, 0.4, 0.5, 0.85)
+			mat_ared.albedo_color = Color(1.0, 0.45, 0.55, 0.85)
 			mat_ared.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			mat_ared.roughness = 0.1
+			mat_ared.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
+			mat_ared.roughness = 0.12
 			dict["accent_red"] = mat_ared
 
 			var mat_ablk = StandardMaterial3D.new()
-			mat_ablk.albedo_color = Color(0.4, 0.45, 0.55, 0.8)
+			mat_ablk.albedo_color = Color(0.45, 0.5, 0.6, 0.8)
 			mat_ablk.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			mat_ablk.roughness = 0.1
+			mat_ablk.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
+			mat_ablk.roughness = 0.12
 			dict["accent_black"] = mat_ablk
 
 			# Crown: Prismatic crystal
 			var mat_crown = StandardMaterial3D.new()
-			mat_crown.albedo_color = Color(0.88, 0.95, 1.0, 0.85)
+			mat_crown.albedo_color = Color(0.9, 0.95, 1.0, 0.9)
 			mat_crown.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat_crown.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
 			mat_crown.metallic = 0.5
 			mat_crown.roughness = 0.1
 			dict["crown"] = mat_crown

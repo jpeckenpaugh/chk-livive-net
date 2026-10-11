@@ -8,6 +8,7 @@ extends Node3D
 @onready var camera: Camera3D = $CameraPivot/Camera3D
 @onready var board: Node3D = $Board
 @onready var pedestal: MeshInstance3D = $BoardPedestal
+@onready var dir_light: DirectionalLight3D = $DirectionalLight3D
 
 @onready var hud: Control = $UI/HUD
 @onready var spectator_bar: Control = $UI/SpectatorBar
@@ -16,10 +17,17 @@ extends Node3D
 @onready var game_over_modal: Control = $UI/GameOverModal
 @onready var theme_modal: Control = $UI/ThemeModal
 
+var _flip_tween: Tween
+
 func _ready() -> void:
 	# Orient camera to look at the board center with slight forward bias to clear top HUD
 	if camera != null:
 		camera.look_at(Vector3(0, 0, -0.15), Vector3.UP)
+
+	# Ensure initial directional light orientation and position for subtle-to-medium specular sheen
+	if dir_light != null:
+		dir_light.rotation = Vector3(deg_to_rad(-50.0), deg_to_rad(30.0), 0.0)
+		dir_light.position = Vector3(-3.5, 12.0, -5.0)
 
 	if ThemeManager != null:
 		ThemeManager.theme_changed.connect(_on_theme_changed)
@@ -80,12 +88,21 @@ func _on_move_animation_requested(data: Dictionary) -> void:
 		board.on_move_animation_requested(data)
 
 func _on_board_flipped(flipped: bool) -> void:
-	if camera_pivot == null:
-		return
-	var target_y: float = PI if flipped else 0.0
-	var tween: Tween = create_tween()
-	tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(camera_pivot, "rotation:y", target_y, 0.6)
+	if _flip_tween != null and _flip_tween.is_valid():
+		_flip_tween.kill()
+
+	var target_cam_y: float = PI if flipped else 0.0
+	var target_light_y: float = deg_to_rad(210.0) if flipped else deg_to_rad(30.0)
+	var target_light_pos: Vector3 = Vector3(3.5, 12.0, 5.0) if flipped else Vector3(-3.5, 12.0, -5.0)
+
+	_flip_tween = create_tween()
+	_flip_tween.set_parallel(true)
+	_flip_tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	if camera_pivot != null:
+		_flip_tween.tween_property(camera_pivot, "rotation:y", target_cam_y, 0.6)
+	if dir_light != null:
+		_flip_tween.tween_property(dir_light, "rotation:y", target_light_y, 0.6)
+		_flip_tween.tween_property(dir_light, "position", target_light_pos, 0.6)
 
 func _on_show_notation_changed(show: bool) -> void:
 	if board != null and board.has_method("set_show_notation"):
